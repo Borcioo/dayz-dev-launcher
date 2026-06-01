@@ -55,7 +55,17 @@ For packing PBOs use DayZ Tools / your existing build step.
 
 ## Install
 
-**Easy way:** download the repo (green **Code → Download ZIP**, then extract;
+**One-liner (recommended).** Paste this into PowerShell — it checks Python
+(offering a winget install), downloads dzl to `%LOCALAPPDATA%\dzl`, sets up the
+venv, and adds `dzl` to your PATH:
+
+```powershell
+powershell -ExecutionPolicy Bypass -Command "irm https://raw.githubusercontent.com/Borcioo/dayz-dev-launcher/main/install.ps1 | iex"
+```
+
+Then open a new terminal and run `dzl`. (Re-run the same line anytime to update.)
+
+**Download + double-click:** grab the repo (green **Code → Download ZIP**, then extract;
 or `git clone`), then **double-click `setup.bat`**. It checks Python (and, if
 it's missing, *offers* to install it via `winget` — your choice, or it points
 you to python.org), creates the virtual environment, installs everything, and
