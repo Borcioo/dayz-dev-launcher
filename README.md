@@ -55,6 +55,13 @@ For packing PBOs use DayZ Tools / your existing build step.
 
 ## Install
 
+**Easy way:** download the repo (green **Code → Download ZIP**, then extract;
+or `git clone`), then **double-click `setup.bat`**. It checks Python, creates
+the virtual environment and installs everything. When it finishes, double-click
+`dzl.bat` to start.
+
+**Manual way:**
+
 ```powershell
 git clone https://github.com/Borcioo/dayz-dev-launcher.git
 cd dayz-dev-launcher
@@ -62,7 +69,8 @@ python -m venv .venv
 .venv\Scripts\python.exe -m pip install -r requirements.txt
 ```
 
-That's it — the `dzl.bat` shim uses `.venv` automatically.
+Either way the `dzl.bat` shim uses `.venv` automatically. (You still need
+Python 3.11+ installed — see [Requirements](#requirements).)
 
 ## Run
 
