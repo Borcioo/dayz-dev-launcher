@@ -67,10 +67,16 @@ if errorlevel 1 (
 )
 
 echo.
+
+REM --- 5) put this folder on the user PATH (so you can type 'dzl') ----------
+echo [..] Adding this folder to your user PATH (for the 'dzl' command) ...
+powershell -NoProfile -Command "$d=(Resolve-Path '%~dp0').Path.TrimEnd('\'); $p=[Environment]::GetEnvironmentVariable('Path','User'); if (-not $p){$p=''}; if (($p -split ';') -notcontains $d){ [Environment]::SetEnvironmentVariable('Path', (($p.TrimEnd(';')+';'+$d).TrimStart(';')),'User'); Write-Host '[ok] added to PATH (user)'} else { Write-Host '[ok] already on PATH' }"
+
+echo.
 echo ============================================================
-echo   All set!  Start the launcher by double-clicking:
-echo       dzl.bat
-echo   (or run  dzl.bat  in a terminal)
+echo   All set!
+echo   Open a NEW terminal, then just run:   dzl
+echo   (or double-click dzl.bat here anytime)
 echo ============================================================
 echo.
 pause

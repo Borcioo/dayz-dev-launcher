@@ -57,8 +57,9 @@ For packing PBOs use DayZ Tools / your existing build step.
 
 **Easy way:** download the repo (green **Code → Download ZIP**, then extract;
 or `git clone`), then **double-click `setup.bat`**. It checks Python, creates
-the virtual environment and installs everything. When it finishes, double-click
-`dzl.bat` to start.
+the virtual environment, installs everything, and adds the folder to your user
+PATH. Then **open a new terminal and just run `dzl`** — or double-click
+`dzl.bat` in the folder. (Keep the folder where it is; PATH points at it.)
 
 **Manual way:**
 
@@ -74,9 +75,14 @@ Python 3.11+ installed — see [Requirements](#requirements).)
 
 ## Run
 
+After `setup.bat`, from any new terminal:
+
 ```powershell
-dzl.bat                       # opens the full TUI
+dzl                           # opens the full TUI
 ```
+
+(or double-click `dzl.bat` in the folder; `dzl.bat` also works if you didn't
+add it to PATH)
 
 First run creates `config.json` with sensible defaults. Open the **config
 screen** (key `c`) to point it at your DayZ install, profiles, port and
@@ -85,18 +91,18 @@ scan-roots — every path field has a 📁 browse button, so you don't type path
 Non-interactive (scriptable) usage:
 
 ```powershell
-dzl.bat mods                  # print the current selection
-dzl.bat start --debug         # start server (DayZDiag, filePatching)
-dzl.bat start --debug --client
-dzl.bat start --normal        # DayZServer (needs packed PBOs)
-dzl.bat stop --client
-dzl.bat restart
-dzl.bat logs script           # tail a log to stdout (Ctrl+C to stop)
-dzl.bat config                # print the whole config as JSON
-dzl.bat config set port 2402
-dzl.bat config add-root D:\my\mods
-dzl.bat preset save chernarus-hc
-dzl.bat preset load chernarus-hc
+dzl mods                      # print the current selection
+dzl start --debug             # start server (DayZDiag, filePatching)
+dzl start --debug --client
+dzl start --normal            # DayZServer (needs packed PBOs)
+dzl stop --client
+dzl restart
+dzl logs script               # tail a log to stdout (Ctrl+C to stop)
+dzl config                    # print the whole config as JSON
+dzl config set port 2402
+dzl config add-root D:\my\mods
+dzl preset save chernarus-hc
+dzl preset load chernarus-hc
 ```
 
 ## TUI layout
