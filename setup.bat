@@ -84,7 +84,7 @@ echo.
 
 REM --- 4) put this folder on the user PATH (so you can type 'dzl') ----------
 echo [..] Adding this folder to your user PATH (for the 'dzl' command) ...
-powershell -NoProfile -Command "$d=(Resolve-Path '%~dp0').Path.TrimEnd('\'); $p=[Environment]::GetEnvironmentVariable('Path','User'); if (-not $p){$p=''}; if (($p -split ';') -notcontains $d){ [Environment]::SetEnvironmentVariable('Path', (($p.TrimEnd(';')+';'+$d).TrimStart(';')),'User'); Write-Host '[ok] added to PATH (user)'} else { Write-Host '[ok] already on PATH' }"
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0_path.ps1" "%~dp0"
 
 echo.
 echo ============================================================

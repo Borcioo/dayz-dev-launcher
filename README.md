@@ -63,7 +63,15 @@ venv, and adds `dzl` to your PATH:
 powershell -ExecutionPolicy Bypass -Command "irm https://raw.githubusercontent.com/Borcioo/dayz-dev-launcher/main/install.ps1 | iex"
 ```
 
-Then open a new terminal and run `dzl`. (Re-run the same line anytime to update.)
+Then open a new terminal and run `dzl`. (Re-run the same line anytime to
+update — it won't add duplicate PATH entries; if it finds an old dzl on your
+PATH it offers to replace it.)
+
+Custom install folder — set `DZL_DIR` first:
+
+```powershell
+$env:DZL_DIR='D:\tools\dzl'; powershell -ExecutionPolicy Bypass -Command "irm https://raw.githubusercontent.com/Borcioo/dayz-dev-launcher/main/install.ps1 | iex"
+```
 
 **Download + double-click:** grab the repo (green **Code → Download ZIP**, then extract;
 or `git clone`), then **double-click `setup.bat`**. It checks Python (and, if

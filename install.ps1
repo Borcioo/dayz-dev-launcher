@@ -8,7 +8,8 @@
 $ErrorActionPreference = 'Stop'
 $RepoGit = 'https://github.com/Borcioo/dayz-dev-launcher.git'
 $RepoZip = 'https://github.com/Borcioo/dayz-dev-launcher/archive/refs/heads/main.zip'
-$Dest    = Join-Path $env:LOCALAPPDATA 'dzl'
+# install location: override with  $env:DZL_DIR='D:\tools\dzl'  before running.
+$Dest = if ($env:DZL_DIR) { $env:DZL_DIR } else { Join-Path $env:LOCALAPPDATA 'dzl' }
 
 function Info($m) { Write-Host "[..] $m" -ForegroundColor Cyan }
 function Ok($m)   { Write-Host "[ok] $m" -ForegroundColor Green }
@@ -88,14 +89,8 @@ Native $venvPy -m pip install --upgrade pip
 Native $venvPy -m pip install -r (Join-Path $Dest 'requirements.txt')
 Ok "Dependencies installed"
 
-# --- 4) PATH (user scope) ---------------------------------------------------
-$p = [Environment]::GetEnvironmentVariable('Path', 'User'); if (-not $p) { $p = '' }
-if (($p -split ';') -notcontains $Dest) {
-    [Environment]::SetEnvironmentVariable('Path', (($p.TrimEnd(';') + ';' + $Dest).TrimStart(';')), 'User')
-    Ok "Added $Dest to your PATH"
-} else {
-    Ok "Already on PATH"
-}
+# --- 4) PATH (user scope) — shared logic, dedups previous installs ----------
+& (Join-Path $Dest '_path.ps1') -Dir $Dest
 
 Write-Host ""
 Write-Host "==== Done! Open a NEW terminal and run:  dzl ====" -ForegroundColor Yellow
