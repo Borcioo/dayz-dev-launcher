@@ -1,5 +1,11 @@
 # dzl — DayZ dev launcher
 
+[![CI](https://github.com/Borcioo/dayz-dev-launcher/actions/workflows/ci.yml/badge.svg)](https://github.com/Borcioo/dayz-dev-launcher/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/Borcioo/dayz-dev-launcher/actions/workflows/codeql.yml/badge.svg)](https://github.com/Borcioo/dayz-dev-launcher/actions/workflows/codeql.yml)
+![Python](https://img.shields.io/badge/python-3.11%2B-blue)
+![Platform](https://img.shields.io/badge/platform-Windows-blue)
+![License](https://img.shields.io/badge/license-GPLv3-blue)
+
 A fast terminal launcher for a **local DayZ modding setup**. Pick mods with
 checkboxes, set load order and per-mod side (server / client / both), start &
 stop the server and client, and watch the logs live — all from one TUI, instead
@@ -41,6 +47,20 @@ exact launch command visible before you hit Start.
 - **Hybrid CLI**: no args → TUI; with flags → run and exit (scriptable).
 
 ---
+
+## Is it safe to run?
+
+It's **100% readable source** — Python plus a couple of `.bat`/`.ps1` scripts,
+no binaries, nothing compiled or obfuscated. You can read every line on GitHub.
+
+- The install one-liner just downloads and runs [`install.ps1`](install.ps1) —
+  open it first if you like, or use the manual `git clone` route instead.
+- Every push runs the **CI** (tests) and **CodeQL** (security scan) workflows —
+  see the badges above.
+- It only touches: your `config.json`/`presets/` (local), your user `PATH`
+  (the `dzl` command), and it launches the DayZ executables you point it at. It
+  doesn't phone home or download anything except its Python dependencies from
+  PyPI during setup.
 
 ## Requirements
 
