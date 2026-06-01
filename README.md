@@ -179,5 +179,5 @@ reports.
 
 ## License
 
-[PolyForm Noncommercial 1.0.0](LICENSE.md) — free to use, modify, fork and
-share for **noncommercial** purposes. Commercial use is reserved to the author.
+[GNU GPLv3](LICENSE) — free to use, study, modify and share. Derivatives and
+distributed copies must remain under the GPL and ship their source.
