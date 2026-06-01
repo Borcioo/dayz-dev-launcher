@@ -1,0 +1,130 @@
+"""Build the launch argv (pure) and manage server/client processes."""
+from __future__ import annotations
+
+import os
+import subprocess
+from pathlib import Path
+
+from .config import Config
+
+
+def open_folder(path) -> bool:
+    """Open a folder in Windows Explorer. Returns False if it doesn't exist."""
+    p = Path(path)
+    if not p.is_dir():
+        return False
+    os.startfile(str(p))  # noqa: S606 (Windows-only launcher)
+    return True
+
+
+def open_log_window(path, tail: int = 200) -> bool:
+    """Pop a log out into its own console that follows it (PowerShell
+    Get-Content -Wait). Returns False if the file doesn't exist yet."""
+    p = Path(path)
+    if not p.is_file():
+        return False
+    ps = f"Get-Content -LiteralPath '{p}' -Wait -Tail {tail}"
+    subprocess.Popen(  # noqa: S602 (Windows console pop-out)
+        f'start "dzl log: {p.name}" powershell -NoExit -Command "{ps}"',
+        shell=True,
+    )
+    return True
+
+
+def mod_paths_string(cfg: Config) -> str:
+    """``;``-joined enabled mod paths (all sides). No quotes, no trailing ';'."""
+    enabled = [m["path"] for m in cfg.mods if m.get("enabled")]
+    return ";".join(enabled)
+
+
+def _join(paths: list[str]) -> str:
+    return ";".join(paths)
+
+
+def mods_for_target(cfg: Config, target: str) -> list[str]:
+    """The ``-mod=`` list for a target, by per-mod side:
+    - server gets ``both`` mods (server-only go to ``-serverMod``);
+    - client gets ``both`` + ``client``-only mods."""
+    out = []
+    for m in cfg.mods:
+        if not m.get("enabled"):
+            continue
+        side = m.get("side", "both")
+        if target == "server" and side == "both":
+            out.append(m["path"])
+        elif target == "client" and side in ("both", "client"):
+            out.append(m["path"])
+    return out
+
+
+def server_only_mods(cfg: Config) -> list[str]:
+    """Enabled mods flagged server-side only -> DayZ ``-serverMod=``."""
+    return [m["path"] for m in cfg.mods
+            if m.get("enabled") and m.get("side", "both") == "server"]
+
+
+def server_exe(cfg: Config, mode: str) -> str:
+    return cfg.exe_debug if mode == "debug" else cfg.exe_normal
+
+
+def client_exe(cfg: Config, mode: str) -> str:
+    return cfg.client_exe_debug if mode == "debug" else cfg.client_exe_normal
+
+
+def build_args(mode: str, target: str, cfg: Config) -> list[str]:
+    """Full argv for a (mode, target). Core args are built from config; the rest
+    are the editable cfg.server_params / cfg.client_params. Pure: no side
+    effects. (mode selects the exe elsewhere; it doesn't change the args here.)"""
+    # -profiles is relative to the DayZ dir (spawn cwd); use each configured
+    # dir's basename so server and client write to separate profile trees and
+    # their logs never collide.
+    server_profiles = Path(cfg.profiles_path).name
+    client_profiles = Path(cfg.client_profiles_path).name
+    if target == "server":
+        args = [
+            "-server",
+            f"-profiles={server_profiles}",
+            f"-mod={_join(mods_for_target(cfg, 'server'))}",
+            f"-config={cfg.config_name}",
+            f"-port={cfg.port}",
+        ]
+        server_only = server_only_mods(cfg)
+        if server_only:
+            args.append(f"-serverMod={_join(server_only)}")
+        return args + list(cfg.server_params)
+    if target == "client":
+        args = [
+            f"-profiles={client_profiles}",
+            f"-mod={_join(mods_for_target(cfg, 'client'))}",
+            f"-mission={cfg.mission}",
+            "-connect=127.0.0.1",
+            f"-port={cfg.port}",
+            f"-name={cfg.player_name}",
+        ]
+        return args + list(cfg.client_params)
+    raise ValueError(f"unknown target: {target}")
+
+
+# ---- process lifecycle (manually verified; thin wrappers over subprocess) ----
+
+def is_running(exe: str) -> bool:
+    out = subprocess.run(
+        ["tasklist", "/FI", f"IMAGENAME eq {exe}"],
+        capture_output=True, text=True,
+    )
+    return exe.lower() in out.stdout.lower()
+
+
+def stop(exe: str) -> None:
+    subprocess.run(["taskkill", "/F", "/IM", exe], capture_output=True, text=True)
+
+
+def spawn(mode: str, target: str, cfg: Config) -> subprocess.Popen:
+    exe = server_exe(cfg, mode) if target == "server" else client_exe(cfg, mode)
+    cmd = [str(Path(cfg.dayz_path) / exe), *build_args(mode, target, cfg)]
+    return subprocess.Popen(cmd, cwd=cfg.dayz_path)
+
+
+def restart_server(mode: str, cfg: Config) -> subprocess.Popen:
+    stop(server_exe(cfg, mode))
+    return spawn(mode, "server", cfg)
