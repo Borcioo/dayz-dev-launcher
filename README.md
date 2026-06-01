@@ -56,10 +56,12 @@ For packing PBOs use DayZ Tools / your existing build step.
 ## Install
 
 **Easy way:** download the repo (green **Code → Download ZIP**, then extract;
-or `git clone`), then **double-click `setup.bat`**. It checks Python, creates
-the virtual environment, installs everything, and adds the folder to your user
-PATH. Then **open a new terminal and just run `dzl`** — or double-click
-`dzl.bat` in the folder. (Keep the folder where it is; PATH points at it.)
+or `git clone`), then **double-click `setup.bat`**. It checks Python (and, if
+it's missing, *offers* to install it via `winget` — your choice, or it points
+you to python.org), creates the virtual environment, installs everything, and
+adds the folder to your user PATH. Then **open a new terminal and just run
+`dzl`** — or double-click `dzl.bat`. (Keep the folder where it is; PATH points
+at it.)
 
 **Manual way:**
 
