@@ -407,10 +407,8 @@ class DzlApp(App):
     #mods { width: 15%; min-width: 26; border: round $accent; height: 1fr; }
     #right { width: 1fr; }
     #bottom { height: auto; }
-    #preview {
-        border: round $warning; height: auto; max-height: 8;
-        padding: 0 1; color: $text-muted;
-    }
+    #preview { border: round $warning; height: auto; max-height: 8; padding: 0 1; }
+    #preview-text { color: $text-muted; width: auto; }
     .pane { border: round $primary; height: 1fr; }
     .pane:focus { border: round $accent; }
     .pane.collapsed { height: 3; }  /* title bar only */
@@ -484,7 +482,8 @@ class DzlApp(App):
                                   highlight=False, wrap=False)
         # full-width bottom strip: live argv preview + the start/stop controls
         with Vertical(id="bottom"):
-            yield Static(self._preview_text(), id="preview")
+            with VerticalScroll(id="preview"):
+                yield Static(self._preview_text(), id="preview-text")
             with Vertical(id="controls"):
                 with Horizontal(classes="ctlrow"):
                     yield Label("SERVER", classes="grp")
@@ -565,9 +564,9 @@ class DzlApp(App):
         return f"SERVER  {srv}\n\nCLIENT  {cli}"
 
     def _refresh_preview(self) -> None:
-        preview = self.query_one("#preview", Static)
+        preview = self.query_one("#preview", VerticalScroll)
         preview.border_title = f"launch params · {self.mode}"
-        preview.update(self._preview_text())
+        self.query_one("#preview-text", Static).update(self._preview_text())
 
     def _sync_mods_from_ui(self) -> None:
         self.cfg.mods = self._enabled_selection()
