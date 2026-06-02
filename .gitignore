@@ -17,3 +17,6 @@ Thumbs.db
 
 # local brainstorm/spec/plan docs (not shipped)
 docs/superpowers/
+
+# AI/TUI shared process statefile
+.dzl-procs.json
