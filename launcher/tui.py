@@ -431,7 +431,7 @@ class DzlApp(App):
     KEYBAR = (
         "[b $success]SRV[/] s·start x·stop r·restart"
         "   [b $success]CLI[/] ^s·start ^x·stop ^r·restart"
-        "   [b $accent]MODS[/] t·side ^↑/^↓·order a·rescan /·search f·enabled =·width"
+        "   [b $accent]MODS[/] t·side ^↑/^↓·order a·rescan /·search f·enabled =·width ^Home/^End·top/bottom"
         "   [b $primary]LOG[/] z·collapse ^↑/^↓·move w·window"
         "   [b $warning]SET[/] d·mode c·config p·presets o·open · q·quit"
     )
@@ -451,6 +451,8 @@ class DzlApp(App):
         ("/", "search", "search mods"),
         ("f", "filter_enabled", "enabled only"),
         ("=", "cycle_width", "widen mods"),
+        ("ctrl+home", "move_top", "move to top"),
+        ("ctrl+end", "move_bottom", "move to bottom"),
         ("z", "toggle_collapse", "collapse pane"),
         ("w", "pop_log", "log in new window"),
         # settings
@@ -908,6 +910,25 @@ class DzlApp(App):
         self.query_one(f"#mod-{j}", Checkbox).focus()
         self._sync_mods_from_ui()  # persist the new order (enabled selection)
         self._refresh_preview()
+
+    async def _move_to(self, where: str) -> None:
+        i = self._focused_mod_index()
+        if i is None:
+            return
+        self._sync_checkbox_state()
+        m = self.mod_list.pop(i)
+        j = 0 if where == "top" else len(self.mod_list)
+        self.mod_list.insert(j, m)
+        await self._rebuild_mod_widgets()
+        self.query_one(f"#mod-{j}", Checkbox).focus()
+        self._sync_mods_from_ui()
+        self._refresh_preview()
+
+    def action_move_top(self) -> None:
+        self.run_worker(self._move_to("top"), exclusive=True)
+
+    def action_move_bottom(self) -> None:
+        self.run_worker(self._move_to("bottom"), exclusive=True)
 
     async def _show_mod_list(self, mod_list) -> None:
         self.mod_list = mod_list
