@@ -203,12 +203,46 @@ def stop(exe: str) -> None:
     subprocess.run(["taskkill", "/F", "/IM", exe], capture_output=True, text=True)
 
 
-def spawn(mode: str, target: str, cfg: Config) -> subprocess.Popen:
+def spawn(mode: str, target: str, cfg: Config, *, source: str = "cli",
+          config_path=None) -> subprocess.Popen:
     exe = server_exe(cfg, mode) if target == "server" else client_exe(cfg, mode)
     cmd = [str(Path(cfg.dayz_path) / exe), *build_args(mode, target, cfg)]
-    return subprocess.Popen(cmd, cwd=cfg.dayz_path)
+    proc = subprocess.Popen(cmd, cwd=cfg.dayz_path)
+    if config_path is not None:
+        write_proc(config_path, target, proc.pid, mode, source, exe)
+    return proc
 
 
-def restart_server(mode: str, cfg: Config) -> subprocess.Popen:
-    stop(server_exe(cfg, mode))
-    return spawn(mode, "server", cfg)
+def _raw_procs(config_path) -> dict:
+    """Read the statefile as-is without any live-PID reconciliation."""
+    p = procs_path(config_path)
+    try:
+        data = json.loads(p.read_text(encoding="utf-8"))
+        return data if isinstance(data, dict) else {}
+    except (FileNotFoundError, ValueError, OSError):
+        return {}
+
+
+def stop_target(target: str, cfg: Config, config_path) -> None:
+    """Stop a target by the PID recorded in the statefile (works no matter who
+    started it; required in debug where server and client share DayZDiag). Falls
+    back to image-name kill if nothing is recorded."""
+    procs = _raw_procs(config_path)
+    info = procs.get(target)
+    if info:
+        subprocess.run(["taskkill", "/F", "/PID", str(info["pid"])],
+                       capture_output=True, text=True)
+    else:
+        mode = (info or {}).get("mode", cfg.mode)
+        exe = server_exe(cfg, mode) if target == "server" else client_exe(cfg, mode)
+        stop(exe)
+    clear_proc(config_path, target)
+
+
+def restart_server(mode: str, cfg: Config, config_path=None,
+                   source: str = "cli") -> subprocess.Popen:
+    if config_path is not None:
+        stop_target("server", cfg, config_path)
+    else:
+        stop(server_exe(cfg, mode))
+    return spawn(mode, "server", cfg, source=source, config_path=config_path)

@@ -151,3 +151,38 @@ def test_read_procs_missing_or_corrupt_is_empty(tmp_path):
     assert read_procs(cfg_path) == {}
     procs_path(cfg_path).write_text("{ broken", encoding="utf-8")
     assert read_procs(cfg_path) == {}
+
+
+def test_spawn_records_statefile(tmp_path, monkeypatch):
+    cfg = load(tmp_path / "config.json")
+    cfg.mods = [{"path": "P:\\@CF", "enabled": True, "side": "both"}]
+
+    class FakePopen:
+        def __init__(self, *a, **k): self.pid = 31337
+
+    monkeypatch.setattr(launch_mod.subprocess, "Popen", FakePopen)
+    monkeypatch.setattr(launch_mod, "pid_image", lambda pid: "DayZDiag_x64.exe")
+    launch_mod.spawn("debug", "server", cfg, source="cli",
+                     config_path=tmp_path / "config.json")
+    procs = launch_mod.read_procs(tmp_path / "config.json")
+    assert procs["server"]["pid"] == 31337
+    assert procs["server"]["source"] == "cli"
+    assert procs["server"]["exe"] == "DayZDiag_x64.exe"
+
+
+def test_stop_target_kills_recorded_pid(tmp_path, monkeypatch):
+    cfg = load(tmp_path / "config.json")
+    launch_mod.write_proc(tmp_path / "config.json", "server", 4242,
+                          "debug", "cli", "DayZDiag_x64.exe")
+    killed = {}
+    monkeypatch.setattr(launch_mod.subprocess, "run",
+                        lambda *a, **k: killed.setdefault("args", a[0]))
+    launch_mod.stop_target("server", cfg, tmp_path / "config.json")
+    assert "/PID" in killed["args"] and "4242" in killed["args"]
+    assert "server" not in _json_load(tmp_path / "config.json")
+
+
+def _json_load(cfg_path):
+    import json
+    p = cfg_path.parent / ".dzl-procs.json"
+    return json.loads(p.read_text()) if p.exists() else {}
