@@ -225,6 +225,24 @@ in full.
 Resize your terminal window/pane — Textual fills whatever size the terminal
 reports.
 
+## Uninstall
+
+From your install folder (or `%LOCALAPPDATA%\dzl`):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File uninstall.ps1
+```
+
+or one line:
+
+```powershell
+powershell -ExecutionPolicy Bypass -Command "irm https://raw.githubusercontent.com/Borcioo/dayz-dev-launcher/main/uninstall.ps1 | iex"
+```
+
+It asks before removing anything, offers to **keep (back up) your config and
+presets**, removes the `dzl` PATH entry and the folder, and leaves Python
+untouched.
+
 ## Tests
 
 ```powershell
