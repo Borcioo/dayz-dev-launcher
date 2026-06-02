@@ -404,7 +404,10 @@ class OpenScreen(ModalScreen):
 class DzlApp(App):
     CSS = """
     #main { height: 1fr; }
-    #mods { width: 15%; min-width: 26; border: round $accent; height: 1fr; }
+    #modcol { width: 15%; min-width: 26; }
+    #mod-search { display: none; }
+    #mod-search.on { display: block; }
+    #mods { border: round $accent; height: 1fr; }
     #right { width: 1fr; }
     #bottom { height: auto; }
     #preview { border: round $warning; height: auto; max-height: 8; padding: 0 1; }
@@ -428,7 +431,7 @@ class DzlApp(App):
     KEYBAR = (
         "[b $success]SRV[/] s·start x·stop r·restart"
         "   [b $success]CLI[/] ^s·start ^x·stop ^r·restart"
-        "   [b $accent]MODS[/] t·side ^↑/^↓·order a·rescan"
+        "   [b $accent]MODS[/] t·side ^↑/^↓·order a·rescan /·search f·enabled"
         "   [b $primary]LOG[/] z·collapse ^↑/^↓·move w·window"
         "   [b $warning]SET[/] d·mode c·config p·presets o·open · q·quit"
     )
@@ -445,6 +448,8 @@ class DzlApp(App):
         ("t", "cycle_side", "side"),
         ("ctrl+up", "move_up", "move up"),
         ("ctrl+down", "move_down", "move down"),
+        ("/", "search", "search mods"),
+        ("f", "filter_enabled", "enabled only"),
         ("z", "toggle_collapse", "collapse pane"),
         ("w", "pop_log", "log in new window"),
         # settings
@@ -467,14 +472,19 @@ class DzlApp(App):
         # scan on open so the list is current (saved loadout + newly-found mods,
         # the new ones disabled). Press 'a' to rescan after changing scan-roots.
         self.mod_list = mods_mod.merge(cfg.mods, mods_mod.discover(cfg.scan_roots))
+        self.mod_filter = ""        # substring filter
+        self.enabled_only = False   # show only enabled mods
 
     def compose(self) -> ComposeResult:
         yield Header()
         with Horizontal(id="main"):
-            with VerticalScroll(id="mods"):
-                for i, m in enumerate(self.mod_list):
-                    yield Checkbox(self._mod_label(i, m),
-                                   value=m.enabled, id=f"mod-{i}")
+            with Vertical(id="modcol"):
+                yield Input(placeholder="filter mods…", id="mod-search")
+                with VerticalScroll(id="mods"):
+                    for i in self._visible_indices():
+                        m = self.mod_list[i]
+                        yield Checkbox(self._mod_label(i, m), value=m.enabled,
+                                       id=f"mod-{i}")
             with Vertical(id="right"):
                 yield Static(self._status_text(), id="bar")
                 for which in self.cfg.logs_shown:
@@ -743,6 +753,31 @@ class DzlApp(App):
     def action_rescan(self) -> None:
         self.run_worker(self._rescan(), exclusive=True)
 
+    def action_search(self) -> None:
+        inp = self.query_one("#mod-search", Input)
+        inp.add_class("on")
+        inp.focus()
+
+    def action_filter_enabled(self) -> None:
+        self.enabled_only = not self.enabled_only
+        self.run_worker(self._rebuild_mod_widgets(), exclusive=True)
+
+    def on_input_changed(self, event: Input.Changed) -> None:
+        if event.input.id == "mod-search":
+            self.mod_filter = event.value
+            self.run_worker(self._rebuild_mod_widgets(), exclusive=True)
+
+    def on_key(self, event) -> None:
+        if event.key == "escape":
+            inp = self.query_one("#mod-search", Input)
+            if inp.has_focus or self.mod_filter:
+                inp.value = ""
+                inp.remove_class("on")
+                self.mod_filter = ""
+                self.set_focus(None)
+                self.run_worker(self._rebuild_mod_widgets(), exclusive=True)
+                event.stop()
+
     def action_cycle_side(self) -> None:
         """Cycle the focused mod's side: both -> server -> client -> both.
         Only one label changes, so update it in place (no full rebuild)."""
@@ -825,6 +860,17 @@ class DzlApp(App):
         self.run_worker(self._rescan(), exclusive=True)
 
     # ---- reorder / rebuild ----
+    def _visible_indices(self):
+        """Indices into self.mod_list that pass the current filter."""
+        out = []
+        for i, m in enumerate(self.mod_list):
+            if self.enabled_only and not m.enabled:
+                continue
+            if self.mod_filter and self.mod_filter.lower() not in m.name.lower():
+                continue
+            out.append(i)
+        return out
+
     def _focused_mod_index(self):
         w = self.focused
         if isinstance(w, Checkbox) and w.id and w.id.startswith("mod-"):
@@ -835,8 +881,9 @@ class DzlApp(App):
         await self.query("#mods Checkbox").remove()
         box = self.query_one("#mods", VerticalScroll)
         await box.mount_all([
-            Checkbox(self._mod_label(i, m), value=m.enabled, id=f"mod-{i}")
-            for i, m in enumerate(self.mod_list)
+            Checkbox(self._mod_label(i, self.mod_list[i]),
+                     value=self.mod_list[i].enabled, id=f"mod-{i}")
+            for i in self._visible_indices()
         ])
 
     async def _move(self, delta: int) -> None:
