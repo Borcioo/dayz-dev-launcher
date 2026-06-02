@@ -87,3 +87,13 @@ def tail_lines(
                     yield buffer.rstrip("\n")
                     buffer = ""
                 time.sleep(poll)
+
+
+def last_lines(path, n: int) -> list:
+    """Return the last n lines of a file (one-shot, no follow). [] if absent."""
+    from collections import deque
+    p = Path(path)
+    if not p.is_file():
+        return []
+    with p.open("r", encoding="utf-8", errors="replace") as fh:
+        return [ln.rstrip("\n") for ln in deque(fh, maxlen=n)]
