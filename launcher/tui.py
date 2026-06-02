@@ -509,6 +509,7 @@ class DzlApp(App):
         self.query_one("#mods").border_title = "mods"
         self.query_one("#bar", Static).border_title = "status"
         self._refresh_preview()
+        self.set_interval(1.5, self._refresh_status)
         for which in self.cfg.logs_shown:
             pane = self.query_one(f"#log-{which}", RichLog)
             pane.can_focus = True  # so it can be selected for z / move
@@ -525,9 +526,14 @@ class DzlApp(App):
         return "UP" if (proc is not None and proc.poll() is None) else "down"
 
     def _status_text(self) -> str:
+        procs = launch_mod.read_procs(self.config_path)
+
+        def fmt(t):
+            info = procs.get(t)
+            return f"UP ({info['source']})" if info else "down"
+
         return (f"mode: {self.mode}   port: {self.cfg.port}   "
-                f"server: {self._proc_state(self.server_proc)}   "
-                f"client: {self._proc_state(self.client_proc)}")
+                f"server: {fmt('server')}   client: {fmt('client')}")
 
     def _kill(self, proc, exe: str):
         """Stop a process we spawned by PID (so we don't take down the other
