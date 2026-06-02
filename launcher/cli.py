@@ -44,6 +44,7 @@ def mods(ctx):
 @click.pass_context
 def start(ctx, debug, client, dry_run):
     cfg = ctx.obj["cfg"]
+    config_path = ctx.obj["config_path"]
     mode = "debug" if debug else "normal"
     targets = ["server"] + (["client"] if client else [])
     for target in targets:
@@ -53,7 +54,7 @@ def start(ctx, debug, client, dry_run):
                    else launch_mod.client_exe)(cfg, mode)
             click.echo(f"{exe} " + " ".join(args))
         else:
-            launch_mod.spawn(mode, target, cfg)
+            launch_mod.spawn(mode, target, cfg, source="cli", config_path=config_path)
             click.echo(f"started {target} ({mode})")
 
 
@@ -63,11 +64,11 @@ def start(ctx, debug, client, dry_run):
 @click.pass_context
 def stop(ctx, debug, client):
     cfg = ctx.obj["cfg"]
-    mode = "debug" if debug else "normal"
-    launch_mod.stop(launch_mod.server_exe(cfg, mode))
+    config_path = ctx.obj["config_path"]
+    launch_mod.stop_target("server", cfg, config_path)
     click.echo("stopped server")
     if client:
-        launch_mod.stop(launch_mod.client_exe(cfg, mode))
+        launch_mod.stop_target("client", cfg, config_path)
         click.echo("stopped client")
 
 
@@ -76,25 +77,88 @@ def stop(ctx, debug, client):
 @click.pass_context
 def restart(ctx, debug):
     cfg = ctx.obj["cfg"]
-    launch_mod.restart_server("debug" if debug else "normal", cfg)
+    launch_mod.restart_server("debug" if debug else "normal", cfg,
+                              config_path=ctx.obj["config_path"], source="cli")
     click.echo("restarted server")
 
 
 @cli.command(name="logs", help="Tail a log to stdout: script|rpt|adm|client.")
 @click.argument("which", type=click.Choice(["script", "rpt", "adm", "client"]))
+@click.option("--lines", "lines", type=int, default=None,
+              help="Print the last N lines and exit (no follow).")
 @click.pass_context
-def logs_cmd(ctx, which):
+def logs_cmd(ctx, which, lines):
     cfg = ctx.obj["cfg"]
     path = logs_mod.resolve(cfg.profiles_path, cfg.client_profiles_path).get(which)
     if not path:
         where = cfg.client_profiles_path if which == "client" else cfg.profiles_path
         click.echo(f"no {which} log found in {where}")
         return
+    if lines is not None:
+        for line in logs_mod.last_lines(path, lines):
+            click.echo(line)
+        return
     try:
         for line in logs_mod.tail_lines(path):
             click.echo(line)
     except KeyboardInterrupt:
         pass
+
+
+@cli.command(help="Show running state, paths, mods and log files.")
+@click.option("--json", "as_json", is_flag=True, help="Machine-readable output.")
+@click.pass_context
+def status(ctx, as_json):
+    import json as _json
+    from pathlib import Path as _P
+    cfg = ctx.obj["cfg"]
+    config_path = ctx.obj["config_path"]
+    procs = launch_mod.read_procs(config_path)
+
+    def target_state(t):
+        info = procs.get(t)
+        if not info:
+            return {"state": "down", "source": None, "mode": None, "pid": None}
+        return {"state": "up", "source": info.get("source"),
+                "mode": info.get("mode"), "pid": info.get("pid")}
+
+    logs = {k: (str(v) if v else None) for k, v in
+            logs_mod.resolve(cfg.profiles_path, cfg.client_profiles_path).items()}
+    data = {
+        "mode": cfg.mode,
+        "port": cfg.port,
+        "active_preset": ctx.obj["active"] or None,
+        "server": target_state("server"),
+        "client": target_state("client"),
+        "paths": {
+            "dayz_path": cfg.dayz_path,
+            "profiles_path": cfg.profiles_path,
+            "client_profiles_path": cfg.client_profiles_path,
+            "config_dir": str(_P(config_path).parent),
+            "presets_dir": str(config_mod.presets_dir(config_path)),
+        },
+        "mods": [{"path": m["path"], "side": m.get("side", "both")}
+                 for m in cfg.mods if m.get("enabled")],
+        "logs": logs,
+    }
+    if as_json:
+        click.echo(_json.dumps(data, indent=2))
+        return
+    s, c = data["server"], data["client"]
+    click.echo(f"mode {data['mode']} | port {data['port']}"
+               + (f" | preset {data['active_preset']}" if data['active_preset'] else ""))
+    click.echo(f"server: {s['state']}" + (f" ({s['source']}, pid {s['pid']})" if s['state']=='up' else ""))
+    click.echo(f"client: {c['state']}" + (f" ({c['source']}, pid {c['pid']})" if c['state']=='up' else ""))
+    click.echo("paths:")
+    for k, v in data["paths"].items():
+        click.echo(f"  {k}: {v}")
+    click.echo(f"mods ({len(data['mods'])} enabled):")
+    for m in data["mods"]:
+        tag = "" if m["side"] == "both" else f"  ({m['side']})"
+        click.echo(f"  {m['path']}{tag}")
+    click.echo("logs:")
+    for k, v in data["logs"].items():
+        click.echo(f"  {k}: {v or '(none)'}")
 
 
 @cli.group(name="config", invoke_without_command=True,
