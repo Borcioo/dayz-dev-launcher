@@ -407,7 +407,7 @@ class DzlApp(App):
     #modcol { width: 15%; min-width: 26; }
     #mod-search { display: none; }
     #mod-search.on { display: block; }
-    #mods { border: round $accent; height: 1fr; }
+    #mods { border: round $accent; height: 1fr; overflow-x: auto; }
     #right { width: 1fr; }
     #bottom { height: auto; }
     #preview { border: round $warning; height: auto; max-height: 8; padding: 0 1; }
@@ -431,7 +431,7 @@ class DzlApp(App):
     KEYBAR = (
         "[b $success]SRV[/] s·start x·stop r·restart"
         "   [b $success]CLI[/] ^s·start ^x·stop ^r·restart"
-        "   [b $accent]MODS[/] t·side ^↑/^↓·order a·rescan /·search f·enabled"
+        "   [b $accent]MODS[/] t·side ^↑/^↓·order a·rescan /·search f·enabled =·width"
         "   [b $primary]LOG[/] z·collapse ^↑/^↓·move w·window"
         "   [b $warning]SET[/] d·mode c·config p·presets o·open · q·quit"
     )
@@ -450,6 +450,7 @@ class DzlApp(App):
         ("ctrl+down", "move_down", "move down"),
         ("/", "search", "search mods"),
         ("f", "filter_enabled", "enabled only"),
+        ("=", "cycle_width", "widen mods"),
         ("z", "toggle_collapse", "collapse pane"),
         ("w", "pop_log", "log in new window"),
         # settings
@@ -474,6 +475,7 @@ class DzlApp(App):
         self.mod_list = mods_mod.merge(cfg.mods, mods_mod.discover(cfg.scan_roots))
         self.mod_filter = ""        # substring filter
         self.enabled_only = False   # show only enabled mods
+        self.mod_width_idx = 0  # 0=narrow 1=medium 2=wide
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -618,6 +620,12 @@ class DzlApp(App):
                 # tail returned: cancelled, or a newer log appeared -> re-resolve
 
         self.run_worker(pump, thread=True, name=f"tail-{which}")
+
+    _MOD_WIDTHS = ("15%", "35%", "60%")
+
+    def action_cycle_width(self) -> None:
+        self.mod_width_idx = (self.mod_width_idx + 1) % len(self._MOD_WIDTHS)
+        self.query_one("#modcol").styles.width = self._MOD_WIDTHS[self.mod_width_idx]
 
     # ---- actions ----
     def action_start(self) -> None:
