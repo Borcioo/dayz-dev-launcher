@@ -107,3 +107,47 @@ def test_open_log_window_spawns_for_existing(tmp_path, monkeypatch):
     assert open_log_window(f) is True
     cmd = calls["a"][0][0]
     assert "Get-Content" in cmd and str(f) in cmd
+
+
+from launcher.launch import (
+    procs_path, read_procs, write_proc, clear_proc, is_pid_alive,
+)
+
+
+def test_procs_path_next_to_config(tmp_path):
+    cfg_path = tmp_path / "config.json"
+    assert procs_path(cfg_path) == tmp_path / ".dzl-procs.json"
+
+
+def test_write_read_clear_proc(tmp_path):
+    cfg_path = tmp_path / "config.json"
+    import os
+    from launcher.launch import pid_image
+    real_exe = pid_image(os.getpid()) or "python.exe"
+    write_proc(cfg_path, "server", os.getpid(), "debug", "tui", real_exe)
+    procs = read_procs(cfg_path)
+    assert procs["server"]["pid"] == os.getpid()
+    assert procs["server"]["source"] == "tui"
+    clear_proc(cfg_path, "server")
+    assert "server" not in read_procs(cfg_path)
+
+
+def test_read_procs_reconciles_dead_pid(tmp_path, monkeypatch):
+    cfg_path = tmp_path / "config.json"
+    write_proc(cfg_path, "server", 999999, "debug", "cli", "DayZDiag_x64.exe")
+    monkeypatch.setattr(launch_mod, "pid_image", lambda pid: None)
+    assert read_procs(cfg_path) == {}
+
+
+def test_read_procs_drops_recycled_pid_wrong_exe(tmp_path, monkeypatch):
+    cfg_path = tmp_path / "config.json"
+    write_proc(cfg_path, "server", 4242, "debug", "cli", "DayZDiag_x64.exe")
+    monkeypatch.setattr(launch_mod, "pid_image", lambda pid: "notepad.exe")
+    assert read_procs(cfg_path) == {}
+
+
+def test_read_procs_missing_or_corrupt_is_empty(tmp_path):
+    cfg_path = tmp_path / "config.json"
+    assert read_procs(cfg_path) == {}
+    procs_path(cfg_path).write_text("{ broken", encoding="utf-8")
+    assert read_procs(cfg_path) == {}

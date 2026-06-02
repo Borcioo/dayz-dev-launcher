@@ -1,11 +1,95 @@
 """Build the launch argv (pure) and manage server/client processes."""
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 from pathlib import Path
 
 from .config import Config
+
+
+def procs_path(config_path) -> Path:
+    """The PID statefile lives next to config.json."""
+    return Path(config_path).parent / ".dzl-procs.json"
+
+
+def pid_image(pid: int):
+    """Return the image (exe) name for a PID, or None if not running."""
+    out = subprocess.run(
+        ["tasklist", "/FI", f"PID eq {pid}", "/NH", "/FO", "CSV"],
+        capture_output=True, text=True,
+    )
+    line = out.stdout.strip()
+    if not line or line.upper().startswith("INFO:"):
+        return None
+    return line.split('","')[0].strip('"')
+
+
+def is_pid_alive(pid: int) -> bool:
+    return pid_image(pid) is not None
+
+
+def read_procs(config_path) -> dict:
+    """Load the statefile and reconcile: keep only entries whose PID is still
+    alive AND still the recorded exe. Missing/corrupt -> {}."""
+    p = procs_path(config_path)
+    try:
+        data = json.loads(p.read_text(encoding="utf-8"))
+    except (FileNotFoundError, ValueError, OSError):
+        return {}
+    if not isinstance(data, dict):
+        return {}
+    live = {}
+    changed = False
+    for target, info in data.items():
+        try:
+            pid = int(info["pid"])
+        except (KeyError, TypeError, ValueError):
+            changed = True
+            continue
+        img = pid_image(pid)
+        if img is not None and img.lower() == str(info.get("exe", "")).lower():
+            live[target] = info
+        else:
+            changed = True
+    if changed:
+        _write_procs(config_path, live)
+    return live
+
+
+def _write_procs(config_path, data: dict) -> None:
+    p = procs_path(config_path)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(json.dumps(data, indent=2), encoding="utf-8")
+
+
+def write_proc(config_path, target: str, pid: int, mode: str,
+               source: str, exe: str) -> None:
+    data = {}
+    p = procs_path(config_path)
+    if p.exists():
+        try:
+            data = json.loads(p.read_text(encoding="utf-8"))
+            if not isinstance(data, dict):
+                data = {}
+        except (ValueError, OSError):
+            data = {}
+    data[target] = {"pid": pid, "mode": mode, "source": source, "exe": exe}
+    _write_procs(config_path, data)
+
+
+def clear_proc(config_path, target: str) -> None:
+    p = procs_path(config_path)
+    if not p.exists():
+        return
+    try:
+        data = json.loads(p.read_text(encoding="utf-8"))
+    except (ValueError, OSError):
+        return
+    if isinstance(data, dict) and target in data:
+        del data[target]
+        _write_procs(config_path, data)
 
 
 def open_folder(path) -> bool:
