@@ -466,10 +466,6 @@ class DzlApp(App):
         self.config_path = config_path  # config.json (holds the active pointer)
         self.active_preset = active_preset
         self.mode = cfg.mode
-        # processes WE spawned, tracked by PID so server/client are
-        # distinguishable even when both are the same DayZDiag exe in debug
-        self.server_proc = None
-        self.client_proc = None
         # scan on open so the list is current (saved loadout + newly-found mods,
         # the new ones disabled). Press 'a' to rescan after changing scan-roots.
         self.mod_list = mods_mod.merge(cfg.mods, mods_mod.discover(cfg.scan_roots))
@@ -521,10 +517,6 @@ class DzlApp(App):
         self._refresh_preview()
 
     # ---- helpers ----
-    @staticmethod
-    def _proc_state(proc) -> str:
-        return "UP" if (proc is not None and proc.poll() is None) else "down"
-
     def _status_text(self) -> str:
         procs = launch_mod.read_procs(self.config_path)
 
@@ -534,14 +526,6 @@ class DzlApp(App):
 
         return (f"mode: {self.mode}   port: {self.cfg.port}   "
                 f"server: {fmt('server')}   client: {fmt('client')}")
-
-    def _kill(self, proc, exe: str):
-        """Stop a process we spawned by PID (so we don't take down the other
-        DayZDiag instance in debug). Fall back to image-name kill if untracked."""
-        if proc is not None and proc.poll() is None:
-            proc.terminate()
-        else:
-            launch_mod.stop(exe)
 
     def _refresh_status(self) -> None:
         self.query_one("#bar", Static).update(self._status_text())
@@ -629,36 +613,35 @@ class DzlApp(App):
     # ---- actions ----
     def action_start(self) -> None:
         self._sync_mods_from_ui()
-        self.server_proc = launch_mod.spawn(self.mode, "server", self.cfg)
+        launch_mod.spawn(self.mode, "server", self.cfg,
+                         source="tui", config_path=self.config_path)
         self._refresh_status()
 
     def action_start_client(self) -> None:
-        # launch the client with the same enabled mods, auto-connecting to the
-        # local server (build_args adds -connect/-name/-window for the client)
         self._sync_mods_from_ui()
-        self.client_proc = launch_mod.spawn(self.mode, "client", self.cfg)
+        launch_mod.spawn(self.mode, "client", self.cfg,
+                         source="tui", config_path=self.config_path)
         self._refresh_status()
 
     def action_stop(self) -> None:
-        self._kill(self.server_proc, launch_mod.server_exe(self.cfg, self.mode))
-        self.server_proc = None
+        launch_mod.stop_target("server", self.cfg, self.config_path)
         self._refresh_status()
 
     def action_restart(self) -> None:
         self._sync_mods_from_ui()
-        self._kill(self.server_proc, launch_mod.server_exe(self.cfg, self.mode))
-        self.server_proc = launch_mod.spawn(self.mode, "server", self.cfg)
+        launch_mod.restart_server(self.mode, self.cfg,
+                                  config_path=self.config_path, source="tui")
         self._refresh_status()
 
     def action_stop_client(self) -> None:
-        self._kill(self.client_proc, launch_mod.client_exe(self.cfg, self.mode))
-        self.client_proc = None
+        launch_mod.stop_target("client", self.cfg, self.config_path)
         self._refresh_status()
 
     def action_restart_client(self) -> None:
         self._sync_mods_from_ui()
-        self._kill(self.client_proc, launch_mod.client_exe(self.cfg, self.mode))
-        self.client_proc = launch_mod.spawn(self.mode, "client", self.cfg)
+        launch_mod.stop_target("client", self.cfg, self.config_path)
+        launch_mod.spawn(self.mode, "client", self.cfg,
+                         source="tui", config_path=self.config_path)
         self._refresh_status()
 
     # control-bar buttons -> the matching action (keyboard still works too)
