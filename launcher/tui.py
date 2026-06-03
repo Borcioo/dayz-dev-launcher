@@ -405,8 +405,7 @@ class DzlApp(App):
     CSS = """
     #main { height: 1fr; }
     #modcol { width: 15%; min-width: 26; }
-    #mod-search { display: none; }
-    #mod-search.on { display: block; }
+    #mod-search { height: 3; }
     #mods { border: round $accent; height: 1fr; overflow-x: auto; }
     #right { width: 1fr; }
     #bottom { height: auto; }
@@ -764,9 +763,8 @@ class DzlApp(App):
         self.run_worker(self._rescan(), exclusive=True)
 
     def action_search(self) -> None:
-        inp = self.query_one("#mod-search", Input)
-        inp.add_class("on")
-        inp.focus()
+        # search box is always visible; '/' just jumps focus into it
+        self.query_one("#mod-search", Input).focus()
 
     def action_filter_enabled(self) -> None:
         self.enabled_only = not self.enabled_only
@@ -782,7 +780,6 @@ class DzlApp(App):
             inp = self.query_one("#mod-search", Input)
             if inp.has_focus or self.mod_filter:
                 inp.value = ""
-                inp.remove_class("on")
                 self.mod_filter = ""
                 self.set_focus(None)
                 self.run_worker(self._rebuild_mod_widgets(), exclusive=True)
