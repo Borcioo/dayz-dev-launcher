@@ -33,6 +33,25 @@ collaborate instead of stepping on each other.
 - So: don't `taskkill DayZDiag` or assemble `-mod=...` yourself. Use the commands
   below. The user stays in control (they can always Stop from the TUI).
 
+## Running dzl from a shell (read this first)
+
+`dzl` is a Windows `.bat`. A normal terminal (PowerShell/cmd) finds it on PATH,
+but some shells — notably the **Git Bash** that Claude Code's Bash tool uses —
+won't run a bare `.bat`, so `dzl status` there fails with `command not found`.
+Invoke it through cmd instead:
+
+```
+cmd /c "dzl status --json"
+cmd /c "dzl start --debug"
+```
+
+In Git Bash specifically, use a double slash so the flag isn't path-mangled:
+`cmd //c "dzl status --json"`. If plain `dzl ...` works in your shell, just use
+that. Last resort (default install location): `cmd //c "%LOCALAPPDATA%\dzl\dzl.bat status"`.
+
+The command examples below are written as `dzl <args>` for readability — wrap
+them in `cmd //c "..."` when your shell can't run the bare `.bat`.
+
 ## First thing to run: get your bearings
 
 Before doing anything, grab the full picture in one call:
