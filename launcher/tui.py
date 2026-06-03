@@ -199,20 +199,17 @@ class ConfigScreen(ModalScreen):
             self.query_one(f"#cfg-{key}", Input).value = path
 
     def _set_filename(self, key: str, path) -> None:
-        # exe fields store just the filename (they live in the DayZ dir, the
-        # spawn cwd). The server config can live anywhere, so keep its path:
-        # relative to the DayZ dir when under it, absolute otherwise — a bare
-        # filename would otherwise be looked for in the spawn cwd and fail.
+        # exe / config files: keep just the name when they live under the DayZ
+        # dir (the spawn cwd), but an absolute path when they're elsewhere — so
+        # an exe or config in another folder can be pointed at directly. A bare
+        # name would otherwise be looked for in the cwd and fail.
         if not path:
             return
-        if key == "config_name":
-            p = Path(path)
-            try:
-                val = str(p.relative_to(Path(self.cfg.dayz_path)))
-            except ValueError:
-                val = str(p)
-        else:
-            val = Path(path).name
+        p = Path(path)
+        try:
+            val = str(p.relative_to(Path(self.cfg.dayz_path)))
+        except ValueError:
+            val = str(p)
         self.query_one(f"#cfg-{key}", Input).value = val
 
     def _set_mission(self, path) -> None:

@@ -235,3 +235,19 @@ def test_client_uses_configurable_connect_ip(tmp_path):
     cfg = _cfg(tmp_path)
     cfg.connect_ip = "10.0.0.5"
     assert "-connect=10.0.0.5" in build_args("debug", "client", cfg)
+
+
+def test_spawn_uses_absolute_exe_path(tmp_path, monkeypatch):
+    cfg = _cfg(tmp_path)
+    cfg.dayz_path = r"E:\DayZ"
+    cfg.exe_debug = r"D:\Gry\DayZServer\DayZServer_x64.exe"  # exe in another folder
+    captured = {}
+
+    class FakePopen:
+        def __init__(self, cmd, **k):
+            captured["exe"] = cmd[0]
+            self.pid = 1
+
+    monkeypatch.setattr(launch_mod.subprocess, "Popen", FakePopen)
+    launch_mod.spawn("debug", "server", cfg)  # config_path=None -> no statefile
+    assert captured["exe"] == r"D:\Gry\DayZServer\DayZServer_x64.exe"
