@@ -283,13 +283,15 @@ class PresetScreen(ModalScreen):
     """
     BINDINGS = [("escape", "cancel", "Cancel")]
 
-    def __init__(self, names: list[str]):
+    def __init__(self, names: list[str], active: str = ""):
         super().__init__()
         self.names = names
+        self.active = active
 
     def compose(self) -> ComposeResult:
         with Vertical(id="presetbox"):
             yield Label("PRESETS — select to Load/Delete, or type a name to Save")
+            yield Label(f"active: {self.active or '—'}", id="preset-active")
             yield OptionList(*self.names, id="preset-list")
             yield Input(placeholder="new preset name (for Save)", id="preset-name")
             with Horizontal(id="presetbtns"):
@@ -553,6 +555,7 @@ class DzlApp(App):
             return f"UP ({info['source']})" if info else "down"
 
         return (f"mode: {self.mode}   port: {self.cfg.port}   "
+                f"profile: {self.active_preset or '—'}   "
                 f"server: {fmt('server')}   client: {fmt('client')}")
 
     def _refresh_status(self) -> None:
@@ -824,7 +827,8 @@ class DzlApp(App):
 
     def action_preset(self) -> None:
         self.push_screen(
-            PresetScreen(config_mod.list_presets(self.config_path)), self._on_preset
+            PresetScreen(config_mod.list_presets(self.config_path), self.active_preset),
+            self._on_preset
         )
 
     def _on_preset(self, result) -> None:
@@ -834,7 +838,11 @@ class DzlApp(App):
         if action == "save":
             self._sync_mods_from_ui()  # capture live checkbox/side selection
             config_mod.save_preset(self.cfg, name, self.config_path)
-            self.notify(f"saved preset '{name}'")
+            config_mod.set_active_preset(name, self.config_path)  # saving activates
+            self.active_preset = name
+            self.save_path = config_mod.preset_file(name, self.config_path)
+            self._refresh_status()
+            self.notify(f"saved & active: '{name}'")
         elif action == "delete":
             config_mod.delete_preset(name, self.config_path)
             if self.active_preset == name:

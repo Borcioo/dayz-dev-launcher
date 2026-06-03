@@ -40,14 +40,16 @@ def test_config_show_outputs_json(tmp_path):
 
 
 def test_config_add_and_rm_root_persist(tmp_path):
+    # edits flow to the active profile (a 'default' is seeded on first run), so
+    # check the effective config via resolve_active, not config.json directly.
     path = _seed(tmp_path)
     r = CliRunner()
     add = r.invoke(cli, ["--config", str(path), "config", "add-root", "D:\\dev\\mods"])
     assert add.exit_code == 0
-    assert "D:\\dev\\mods" in load(path).scan_roots  # persisted to disk
+    assert "D:\\dev\\mods" in resolve_active(path)[0].scan_roots  # persisted
     rm = r.invoke(cli, ["--config", str(path), "config", "rm-root", "D:\\dev\\mods"])
     assert rm.exit_code == 0
-    assert "D:\\dev\\mods" not in load(path).scan_roots
+    assert "D:\\dev\\mods" not in resolve_active(path)[0].scan_roots
 
 
 def test_config_set_port_and_reject_unknown(tmp_path):
@@ -55,26 +57,38 @@ def test_config_set_port_and_reject_unknown(tmp_path):
     r = CliRunner()
     ok = r.invoke(cli, ["--config", str(path), "config", "set", "port", "2402"])
     assert ok.exit_code == 0
-    assert load(path).port == 2402
+    assert resolve_active(path)[0].port == 2402  # saved into the active profile
     bad = r.invoke(cli, ["--config", str(path), "config", "set", "bogus", "x"])
     assert bad.exit_code != 0  # ClickException
 
 
-def test_preset_activate_resolves_to_preset(tmp_path):
+def test_preset_save_activates(tmp_path):
+    # saving a preset makes it active (so the setup actually sticks next session).
     path = _seed(tmp_path)
     r = CliRunner()
-    # port 2600 -> snapshot as preset "alpha"
-    r.invoke(cli, ["--config", str(path), "config", "set", "port", "2600"])
     s = r.invoke(cli, ["--config", str(path), "preset", "save", "alpha"])
     assert s.exit_code == 0
-    assert "alpha" in r.invoke(cli, ["--config", str(path), "preset"]).output
-    # change config.json, then activate alpha -> pointer set, not a content copy
-    r.invoke(cli, ["--config", str(path), "config", "set", "port", "9999"])
+    assert load(path).active_preset == "alpha"        # pointer flipped on save
+    assert "* alpha" in r.invoke(cli, ["--config", str(path), "preset"]).output
+
+
+def test_preset_load_switches_active_profile(tmp_path):
+    path = _seed(tmp_path)
+    r = CliRunner()
+    # alpha @2600 (save activates it), beta @2700 (edit lands in the active beta)
+    r.invoke(cli, ["--config", str(path), "config", "set", "port", "2600"])
+    r.invoke(cli, ["--config", str(path), "preset", "save", "alpha"])
+    r.invoke(cli, ["--config", str(path), "preset", "save", "beta"])
+    r.invoke(cli, ["--config", str(path), "config", "set", "port", "2700"])
+    # switching the pointer changes the effective config back to alpha's snapshot
     ld = r.invoke(cli, ["--config", str(path), "preset", "load", "alpha"])
     assert ld.exit_code == 0
-    assert load(path).active_preset == "alpha"   # pointer flipped
-    cfg, _, name = resolve_active(path)           # effective config = the preset
+    assert load(path).active_preset == "alpha"
+    cfg, _, name = resolve_active(path)
     assert name == "alpha" and cfg.port == 2600
+    assert resolve_active(path)  # beta kept 2700
+    r.invoke(cli, ["--config", str(path), "preset", "load", "beta"])
+    assert resolve_active(path)[0].port == 2700
     # load unknown -> error
     bad = r.invoke(cli, ["--config", str(path), "preset", "load", "ghost"])
     assert bad.exit_code != 0

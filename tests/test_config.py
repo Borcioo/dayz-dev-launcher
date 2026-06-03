@@ -4,7 +4,7 @@ from launcher.config import (
     Config, load, save, DEFAULTS,
     set_scalar, add_root, remove_root, set_roots,
     save_preset, load_preset, list_presets, delete_preset,
-    resolve_active, set_active_preset, preset_file,
+    resolve_active, set_active_preset, preset_file, ensure_default,
 )
 
 
@@ -112,3 +112,40 @@ def test_resolve_active_ignores_dangling_pointer(tmp_path):
     _, save_path, name = resolve_active(path)
     assert name == ""
     assert save_path == path
+
+
+def test_ensure_default_seeds_and_activates_on_first_run(tmp_path):
+    path = tmp_path / "config.json"
+    cfg = load(path)
+    cfg.port = 2345
+    save(cfg, path)
+    name = ensure_default(path)
+    assert name == "default"
+    assert "default" in list_presets(path)
+    # active pointer persisted, and it captured the current config
+    rcfg, save_path, active = resolve_active(path)
+    assert active == "default"
+    assert rcfg.port == 2345
+    assert save_path == preset_file("default", path)
+
+
+def test_ensure_default_is_noop_when_preset_already_active(tmp_path):
+    path = tmp_path / "config.json"
+    save_preset(load(path), "proj", path)
+    set_active_preset("proj", path)
+    assert ensure_default(path) == "proj"
+    assert "default" not in list_presets(path)
+
+
+def test_ensure_default_is_noop_when_presets_exist_but_none_active(tmp_path):
+    path = tmp_path / "config.json"
+    save_preset(load(path), "proj", path)  # exists, but not active
+    assert ensure_default(path) == ""       # don't override the user's choice
+    assert "default" not in list_presets(path)
+
+
+def test_ensure_default_idempotent(tmp_path):
+    path = tmp_path / "config.json"
+    ensure_default(path)
+    ensure_default(path)  # second call must not re-seed or clobber
+    assert list_presets(path) == ["default"]

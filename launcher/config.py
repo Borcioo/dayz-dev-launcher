@@ -183,6 +183,23 @@ def set_active_preset(name: str, config_path: Path = DEFAULT_PATH) -> None:
     save(base, config_path)
 
 
+def ensure_default(config_path: Path = DEFAULT_PATH) -> str:
+    """Guarantee a named profile is active, so every setup persists in a profile
+    across sessions — no silent config.json-only state, no manual 'save preset'
+    needed before edits stick. On first run (no active pointer AND no presets)
+    seed a 'default' profile from the current config and activate it. No-op if a
+    preset is already active, or if presets exist (don't override the user's
+    choice). Returns the active preset name (possibly "")."""
+    config_path = Path(config_path)
+    base = load(config_path)
+    if base.active_preset or list_presets(config_path):
+        return base.active_preset
+    save_preset(base, "default", config_path)
+    base.active_preset = "default"
+    save(base, config_path)
+    return "default"
+
+
 def resolve_active(config_path: Path = DEFAULT_PATH):
     """Resolve the working config + where edits should be saved.
 

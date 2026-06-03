@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+### Profiles always persist
+- A **`default` profile is seeded and activated on first run**, so your mods,
+  paths and params are saved from the start — no need to manually create a
+  profile first for changes to stick.
+- **Saving a preset now also activates it** (in the TUI and via `dzl preset
+  save`), so the setup you just saved is the one loaded next session.
+- `dzl status` and the TUI status bar show the active profile, and both read it
+  without you having to load it first.
+- The active profile is remembered between sessions (unchanged behaviour, now
+  reliably reached because there is always an active profile).
+
 ## 0.2.0 — human + AI collaboration, mods UX, fully editable launch
 
 ### Human + tool work on the same launcher

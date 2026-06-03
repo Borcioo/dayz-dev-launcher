@@ -15,6 +15,9 @@ from . import logs as logs_mod
 @click.pass_context
 def cli(ctx, config_path):
     config_path = Path(config_path) if config_path else config_mod.DEFAULT_PATH
+    # first run: seed + activate a 'default' profile so edits always persist in a
+    # named profile (no config.json-only limbo). Idempotent once a preset exists.
+    config_mod.ensure_default(config_path)
     # working config comes from the active preset if one is set, else config.json;
     # edits are saved back to that same source (save_path).
     cfg, save_path, active = config_mod.resolve_active(config_path)
@@ -234,8 +237,11 @@ def preset_cmd(ctx):
 @click.argument("name")
 @click.pass_context
 def preset_save(ctx, name):
-    target = config_mod.save_preset(ctx.obj["cfg"], name, ctx.obj["config_path"])
+    config_path = ctx.obj["config_path"]
+    target = config_mod.save_preset(ctx.obj["cfg"], name, config_path)
+    config_mod.set_active_preset(name, config_path)  # saving = make it active
     click.echo(f"saved preset -> {target}")
+    click.echo(f"active preset -> '{name}'")
 
 
 @preset_cmd.command(name="load",

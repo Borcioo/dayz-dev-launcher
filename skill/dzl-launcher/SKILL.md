@@ -128,10 +128,15 @@ dzl config set port 2402         # set a scalar (paths, port, player_name, conne
 dzl config add-root D:\my\mods   # add a folder to scan for mods
 dzl config rm-root  D:\my\mods
 dzl mods                         # list the enabled mod selection (path + side)
-dzl preset                       # list presets (per-project setups)
-dzl preset load chernarus-hc     # make a preset active (loads on next start; also what the TUI uses)
-dzl preset save dev-snapshot     # snapshot the current config as a preset
+dzl preset                       # list presets/profiles ('*' marks the active one)
+dzl preset load chernarus-hc     # switch the active profile (persists across sessions)
+dzl preset save dev-snapshot     # snapshot current config AND make it the active profile
 ```
+
+There is always an **active profile**: a `default` is seeded on first run, so
+`config set` / `add-root` edits persist immediately (they're written to the
+active profile, not a throwaway). `dzl status` and the TUI both read the active
+profile without anyone having to load it first. Saving a preset activates it.
 
 Editing config: prefer small, explicit changes the user asked for. The TUI does
 **not** hot-reload config you change from the CLI — if the user has it open,

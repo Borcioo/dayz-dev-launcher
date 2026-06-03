@@ -191,10 +191,13 @@ Claude Code session.
 - `config.json` (gitignored) holds your paths, port, mission, mod selection,
   log layout and launch params. Edit it in the `c` screen, via `dzl config …`,
   or by hand.
-- **Presets** (`presets/<name>.json`, gitignored) are full config snapshots —
-  one per project/map. Loading one makes it the active config (the launcher
-  remembers the last one and loads it on startup). Manage them with `p` in the
-  TUI or `dzl preset save|load|rm|list`.
+- **Presets / profiles** (`presets/<name>.json`, gitignored) are full config
+  snapshots — one per project/map. There's always an **active profile**: a
+  `default` is seeded on first run, so your edits persist immediately without
+  any manual save. **Saving a preset activates it**, and loading one switches the
+  active profile; the launcher remembers it and loads it on startup. The active
+  profile is shown in the status bar and in `dzl status`. Manage them with `p` in
+  the TUI or `dzl preset save|load|rm|list`.
 
 ## How the launch command is built
 
