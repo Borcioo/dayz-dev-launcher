@@ -186,3 +186,25 @@ def _json_load(cfg_path):
     import json
     p = cfg_path.parent / ".dzl-procs.json"
     return json.loads(p.read_text()) if p.exists() else {}
+
+
+def test_server_flag_only_in_debug(tmp_path):
+    cfg = _cfg(tmp_path)
+    assert "-server" in build_args("debug", "server", cfg)
+    assert "-server" not in build_args("normal", "server", cfg)
+
+
+def test_profiles_relative_when_under_dayz(tmp_path):
+    cfg = load(tmp_path / "config.json")
+    cfg.dayz_path = r"E:\DayZ"
+    cfg.profiles_path = r"E:\DayZ\profiles"
+    args = build_args("debug", "server", cfg)
+    assert "-profiles=profiles" in args
+
+
+def test_profiles_absolute_when_outside_dayz(tmp_path):
+    cfg = load(tmp_path / "config.json")
+    cfg.dayz_path = r"E:\DayZ"
+    cfg.profiles_path = r"D:\custom\prof"
+    args = build_args("debug", "server", cfg)
+    assert r"-profiles=D:\custom\prof" in args

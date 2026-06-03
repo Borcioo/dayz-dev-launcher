@@ -125,6 +125,16 @@ def _join(paths: list[str]) -> str:
     return ";".join(paths)
 
 
+def _profiles_arg(path, dayz) -> str:
+    """`-profiles=` value: relative to the DayZ dir when the profiles dir lives
+    under it, else the absolute path (a bare name would resolve against cwd)."""
+    p = Path(path)
+    try:
+        return str(p.relative_to(Path(dayz)))
+    except ValueError:
+        return str(p)
+
+
 def mods_for_target(cfg: Config, target: str) -> list[str]:
     """The ``-mod=`` list for a target, by per-mod side:
     - server gets ``both`` mods (server-only go to ``-serverMod``);
@@ -159,14 +169,15 @@ def build_args(mode: str, target: str, cfg: Config) -> list[str]:
     """Full argv for a (mode, target). Core args are built from config; the rest
     are the editable cfg.server_params / cfg.client_params. Pure: no side
     effects. (mode selects the exe elsewhere; it doesn't change the args here.)"""
-    # -profiles is relative to the DayZ dir (spawn cwd); use each configured
-    # dir's basename so server and client write to separate profile trees and
-    # their logs never collide.
-    server_profiles = Path(cfg.profiles_path).name
-    client_profiles = Path(cfg.client_profiles_path).name
+    server_profiles = _profiles_arg(cfg.profiles_path, cfg.dayz_path)
+    client_profiles = _profiles_arg(cfg.client_profiles_path, cfg.dayz_path)
     if target == "server":
-        args = [
-            "-server",
+        args = []
+        # -server makes DayZDiag/DayZ_x64 run as a server; the dedicated
+        # DayZServer_x64.exe IS the server and must NOT receive -server.
+        if mode == "debug":
+            args.append("-server")
+        args += [
             f"-profiles={server_profiles}",
             f"-mod={_join(mods_for_target(cfg, 'server'))}",
             f"-config={cfg.config_name}",
