@@ -416,7 +416,7 @@ class DzlApp(App):
     #right { width: 1fr; }
     #bottom { height: auto; }
     #preview { border: round $warning; height: auto; max-height: 8; padding: 0 1; }
-    #preview-text { color: $text-muted; width: auto; }
+    #preview-text { color: $text-muted; width: 1fr; }
     .pane { border: round $primary; height: 1fr; }
     .pane:focus { border: round $accent; }
     .pane.collapsed { height: 3; }  /* title bar only */
