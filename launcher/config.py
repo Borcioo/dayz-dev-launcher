@@ -24,6 +24,7 @@ DEFAULTS = {
     "mission": "./mpmissions/dayzOffline.chernarusplus",
     "player_name": "DevMacie",
     "config_name": "serverDZ.cfg",
+    "connect_ip": "127.0.0.1",  # client -connect target
     "mods": [],
     "logs_shown": ["script", "rpt", "adm", "client"],
     "mode": "debug",
@@ -55,6 +56,7 @@ class Config:
     mission: str
     player_name: str
     config_name: str
+    connect_ip: str = "127.0.0.1"
     mods: list[dict] = field(default_factory=list)
     logs_shown: list[str] = field(default_factory=list)
     mode: str = "debug"
@@ -85,7 +87,7 @@ def save(cfg: Config, path: Path = DEFAULT_PATH) -> None:
 EDITABLE_SCALARS = (
     "dayz_path", "dayz_tools_path", "profiles_path", "client_profiles_path",
     "exe_debug", "exe_normal", "client_exe_debug", "client_exe_normal",
-    "port", "mission", "player_name", "config_name",
+    "port", "mission", "player_name", "config_name", "connect_ip",
 )
 
 

@@ -208,3 +208,9 @@ def test_profiles_absolute_when_outside_dayz(tmp_path):
     cfg.profiles_path = r"D:\custom\prof"
     args = build_args("debug", "server", cfg)
     assert r"-profiles=D:\custom\prof" in args
+
+
+def test_client_uses_configurable_connect_ip(tmp_path):
+    cfg = _cfg(tmp_path)
+    cfg.connect_ip = "10.0.0.5"
+    assert "-connect=10.0.0.5" in build_args("debug", "client", cfg)

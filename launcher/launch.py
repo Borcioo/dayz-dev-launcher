@@ -192,7 +192,7 @@ def build_args(mode: str, target: str, cfg: Config) -> list[str]:
             f"-profiles={client_profiles}",
             f"-mod={_join(mods_for_target(cfg, 'client'))}",
             f"-mission={cfg.mission}",
-            "-connect=127.0.0.1",
+            f"-connect={cfg.connect_ip}",
             f"-port={cfg.port}",
             f"-name={cfg.player_name}",
         ]

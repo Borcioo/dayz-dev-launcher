@@ -165,6 +165,7 @@ class ConfigScreen(ModalScreen):
         ("port", "Port"),
         ("mission", "Mission"),
         ("player_name", "Player name"),
+        ("connect_ip", "Client connect IP"),
     ]
 
     def __init__(self, cfg: config_mod.Config):
@@ -344,10 +345,11 @@ class ParamsScreen(ModalScreen):
     """
     BINDINGS = [("escape", "cancel", "Cancel")]
 
-    def __init__(self, label: str, params: list[str]):
+    def __init__(self, label: str, params: list[str], defaults: list[str]):
         super().__init__()
         self.label_text = label
         self.params = params
+        self.defaults = defaults
 
     def compose(self) -> ComposeResult:
         with Vertical(id="paramsbox"):
@@ -355,6 +357,7 @@ class ParamsScreen(ModalScreen):
                         "(core -mod/-port/etc. are added automatically)")
             yield TextArea("\n".join(self.params), id="params-text")
             with Horizontal(id="paramsbtns"):
+                yield Button("Reset", id="params-reset")
                 yield Button("Save", variant="success", id="params-save")
                 yield Button("Cancel", id="params-cancel")
 
@@ -364,6 +367,9 @@ class ParamsScreen(ModalScreen):
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "params-cancel":
             self.dismiss(None)
+            return
+        if event.button.id == "params-reset":
+            self.query_one("#params-text", TextArea).text = "\n".join(self.defaults)
             return
         lines = [ln.strip() for ln in
                  self.query_one("#params-text", TextArea).text.splitlines()]
@@ -697,10 +703,11 @@ class DzlApp(App):
             getattr(self, f"action_{action}")()
 
     def _open_params(self, target: str) -> None:
-        current = (self.cfg.server_params if target == "server"
-                   else self.cfg.client_params)
+        key = "server_params" if target == "server" else "client_params"
+        current = getattr(self.cfg, key)
+        defaults = config_mod.DEFAULTS[key]
         self.push_screen(
-            ParamsScreen(target.upper(), list(current)),
+            ParamsScreen(target.upper(), list(current), list(defaults)),
             lambda result: self._apply_params(target, result),
         )
 
