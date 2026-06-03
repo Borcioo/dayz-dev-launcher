@@ -405,7 +405,9 @@ class DzlApp(App):
     CSS = """
     #main { height: 1fr; }
     #modcol { width: 15%; min-width: 26; }
-    #mod-search { height: 3; }
+    #mod-searchrow { height: 3; }
+    #mod-search { width: 1fr; }
+    #mod-clear { width: 5; min-width: 5; margin-left: 1; }
     #mods { border: round $accent; height: 1fr; overflow-x: auto; }
     #right { width: 1fr; }
     #bottom { height: auto; }
@@ -482,7 +484,9 @@ class DzlApp(App):
         yield Header()
         with Horizontal(id="main"):
             with Vertical(id="modcol"):
-                yield Input(placeholder="filter mods…", id="mod-search")
+                with Horizontal(id="mod-searchrow"):
+                    yield Input(placeholder="filter mods…", id="mod-search")
+                    yield Button("✕", id="mod-clear")
                 with VerticalScroll(id="mods"):
                     for i in self._visible_indices():
                         m = self.mod_list[i]
@@ -674,6 +678,9 @@ class DzlApp(App):
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         bid = event.button.id
+        if bid == "mod-clear":
+            self._clear_filter()
+            return
         if bid in ("srv-params", "cli-params"):
             self._open_params("server" if bid == "srv-params" else "client")
             return
@@ -778,14 +785,17 @@ class DzlApp(App):
             self.mod_filter = event.value
             self.run_worker(self._rebuild_mod_widgets(), exclusive=True)
 
+    def _clear_filter(self) -> None:
+        self.query_one("#mod-search", Input).value = ""
+        self.mod_filter = ""
+        self.set_focus(None)
+        self.run_worker(self._rebuild_mod_widgets(), exclusive=True)
+
     def on_key(self, event) -> None:
         if event.key == "escape":
             inp = self.query_one("#mod-search", Input)
             if inp.has_focus or self.mod_filter:
-                inp.value = ""
-                self.mod_filter = ""
-                self.set_focus(None)
-                self.run_worker(self._rebuild_mod_widgets(), exclusive=True)
+                self._clear_filter()
                 event.stop()
 
     def action_cycle_side(self) -> None:
