@@ -405,9 +405,13 @@ class DzlApp(App):
     CSS = """
     #main { height: 1fr; }
     #modcol { width: 15%; min-width: 26; }
-    #mod-searchrow { height: 3; }
-    #mod-search { width: 1fr; }
-    #mod-clear { width: 5; min-width: 5; margin-left: 1; }
+    #mod-searchrow { height: 3; margin-bottom: 1; }
+    #mod-search { width: 1fr; border: round $accent; background: $surface; }
+    #mod-search:focus { border: round $accent-lighten-1; }
+    #mod-clear {
+        width: 5; min-width: 5; height: 3; margin-left: 1;
+        border: round $accent; background: $surface;
+    }
     #mods { border: round $accent; height: 1fr; overflow-x: auto; }
     #right { width: 1fr; }
     #bottom { height: auto; }
