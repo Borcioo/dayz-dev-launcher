@@ -202,11 +202,17 @@ Claude Code session.
 |------|--------|
 | `-mod=` / `-serverMod=` | the mod checkboxes + per-mod side |
 | `-profiles=` | server / client profiles dirs (separate, so logs don't collide) |
-| `-config=`, `-port=`, `-mission=`, `-name=` | config fields |
-| `-server`, `-connect=127.0.0.1` | fixed (server marker / local connect) |
-| everything else (`-filePatching`, `-window`, …) | editable **Params** per target |
+| `-config=`, `-port=`, `-mission=`, `-name=`, `-connect=` | config fields (paths, port, player name, connect IP — all editable) |
+| everything else (`-filePatching`, `-window`, …) | editable **Params**, kept per target **and per mode** |
 
-The mode toggle (`debug`/`normal`) only selects the exe.
+`-server` is the only fixed flag, and only in **debug** (the diagnostic build
+runs as a server with it; the dedicated `DayZServer_x64.exe` must not get it).
+The mode toggle (`debug`/`normal`) selects the exe **and** which set of Params
+applies — so dev and production keep separate flags. The **Params** editor edits
+the current mode's set and has a **Reset** to restore that mode's defaults.
+
+Paths to the executables, the server config and the profile folders can be
+absolute (point at files in another folder), not just names inside the DayZ dir.
 
 ## FAQ
 
@@ -228,9 +234,10 @@ It's detected if it has `addons/` **or** `config.cpp` + a `scripts/` folder. Mak
 sure its parent is in your scan-roots.
 
 **Server won't start in `normal` mode.**
-Normal mode uses `DayZServer_x64.exe` and won't filePatch — your mods must be
-packed PBOs, and you should drop `-filePatching` / `-scriptDebug` from the
-server/client **Params** (those need a diag build).
+Normal mode uses `DayZServer_x64.exe`, which is the dedicated server — it needs
+packed PBOs and no diag-only flags. Params are per-mode, so the **normal** set
+already leaves out `-filePatching` / `-scriptDebug` by default; if you added them
+yourself, remove them (open **Params** while in normal mode).
 
 **`dzl.bat` says the venv is missing.**
 Run the two setup commands under [Install](#install). The venv lives in `.venv`
