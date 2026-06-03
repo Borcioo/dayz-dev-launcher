@@ -478,7 +478,7 @@ class DzlApp(App):
         self.mod_list = mods_mod.merge(cfg.mods, mods_mod.discover(cfg.scan_roots))
         self.mod_filter = ""        # substring filter
         self.enabled_only = False   # show only enabled mods
-        self.mod_width_idx = 0  # 0=narrow 1=medium 2=wide
+        self.mod_width_idx = cfg.mod_width_idx % 3  # persisted width step
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -518,6 +518,7 @@ class DzlApp(App):
 
     def on_mount(self) -> None:
         self.sub_title = f"{self.mode} mode"
+        self.query_one("#modcol").styles.width = self._MOD_WIDTHS[self.mod_width_idx]
         self.query_one("#mods").border_title = "mods"
         self.query_one("#bar", Static).border_title = "status"
         self._refresh_preview()
@@ -634,6 +635,8 @@ class DzlApp(App):
     def action_cycle_width(self) -> None:
         self.mod_width_idx = (self.mod_width_idx + 1) % len(self._MOD_WIDTHS)
         self.query_one("#modcol").styles.width = self._MOD_WIDTHS[self.mod_width_idx]
+        self.cfg.mod_width_idx = self.mod_width_idx
+        config_mod.save(self.cfg, self.save_path)
 
     # ---- actions ----
     def action_start(self) -> None:

@@ -27,6 +27,7 @@ DEFAULTS = {
     "mods": [],
     "logs_shown": ["script", "rpt", "adm", "client"],
     "mode": "debug",
+    "mod_width_idx": 0,  # mods column width step (0=narrow 1=med 2=wide)
     "active_preset": "",  # name of the preset to load on startup ("" = none)
     # extra launch flags appended after the core args (editable in the UI).
     # core args (-server/-profiles/-mod/-config/-port/-mission/-connect/-name)
@@ -57,6 +58,7 @@ class Config:
     mods: list[dict] = field(default_factory=list)
     logs_shown: list[str] = field(default_factory=list)
     mode: str = "debug"
+    mod_width_idx: int = 0
     active_preset: str = ""
     server_params: list[str] = field(default_factory=list)
     client_params: list[str] = field(default_factory=list)
