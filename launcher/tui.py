@@ -703,24 +703,23 @@ class DzlApp(App):
             getattr(self, f"action_{action}")()
 
     def _open_params(self, target: str) -> None:
-        key = "server_params" if target == "server" else "client_params"
+        # edit the flag set for THIS mode (debug/normal kept separate)
+        key = launch_mod.params_attr(target, self.mode)
         current = getattr(self.cfg, key)
         defaults = config_mod.DEFAULTS[key]
         self.push_screen(
-            ParamsScreen(target.upper(), list(current), list(defaults)),
-            lambda result: self._apply_params(target, result),
+            ParamsScreen(f"{target.upper()} ({self.mode})", list(current),
+                         list(defaults)),
+            lambda result: self._apply_params(key, target, result),
         )
 
-    def _apply_params(self, target: str, result) -> None:
+    def _apply_params(self, key: str, target: str, result) -> None:
         if result is None:
             return
-        if target == "server":
-            self.cfg.server_params = result
-        else:
-            self.cfg.client_params = result
+        setattr(self.cfg, key, result)
         config_mod.save(self.cfg, self.save_path)
         self._refresh_preview()
-        self.notify(f"{target} params updated")
+        self.notify(f"{target} params ({self.mode}) updated")
 
     def action_toggle_mode(self) -> None:
         self.mode = "normal" if self.mode == "debug" else "debug"

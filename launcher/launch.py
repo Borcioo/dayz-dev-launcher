@@ -157,6 +157,15 @@ def server_only_mods(cfg: Config) -> list[str]:
             if m.get("enabled") and m.get("side", "both") == "server"]
 
 
+def params_attr(target: str, mode: str) -> str:
+    """The config attribute holding the editable flags for (target, mode)."""
+    return f"{target}_params_{mode}"
+
+
+def params_for(cfg: Config, target: str, mode: str) -> list:
+    return list(getattr(cfg, params_attr(target, mode)))
+
+
 def server_exe(cfg: Config, mode: str) -> str:
     return cfg.exe_debug if mode == "debug" else cfg.exe_normal
 
@@ -186,7 +195,7 @@ def build_args(mode: str, target: str, cfg: Config) -> list[str]:
         server_only = server_only_mods(cfg)
         if server_only:
             args.append(f"-serverMod={_join(server_only)}")
-        return args + list(cfg.server_params)
+        return args + list(params_for(cfg, "server", mode))
     if target == "client":
         args = [
             f"-profiles={client_profiles}",
@@ -196,7 +205,7 @@ def build_args(mode: str, target: str, cfg: Config) -> list[str]:
             f"-port={cfg.port}",
             f"-name={cfg.player_name}",
         ]
-        return args + list(cfg.client_params)
+        return args + list(params_for(cfg, "client", mode))
     raise ValueError(f"unknown target: {target}")
 
 

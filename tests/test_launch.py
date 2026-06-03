@@ -1,4 +1,4 @@
-from launcher.config import load
+from launcher.config import load, save, DEFAULTS
 from launcher import launch as launch_mod
 from launcher.launch import build_args, mod_paths_string, open_folder, open_log_window
 
@@ -64,14 +64,35 @@ def test_client_uses_separate_profiles_dir(tmp_path):
 
 def test_build_args_appends_editable_params(tmp_path):
     cfg = _cfg(tmp_path)
-    cfg.server_params = ["-customFlag", "-freezecheck"]
-    cfg.client_params = ["-window", "-myClientFlag"]
+    cfg.server_params_debug = ["-customFlag", "-freezecheck"]
+    cfg.client_params_debug = ["-window", "-myClientFlag"]
     srv = build_args("debug", "server", cfg)
     cli = build_args("debug", "client", cfg)
     assert srv[-2:] == ["-customFlag", "-freezecheck"]  # appended after core
     assert "-server" in srv
     assert cli[-2:] == ["-window", "-myClientFlag"]
     assert "-connect=127.0.0.1" in cli
+
+
+def test_params_are_per_mode(tmp_path):
+    cfg = _cfg(tmp_path)
+    cfg.server_params_debug = ["-debugFlag"]
+    cfg.server_params_normal = ["-normalFlag"]
+    assert build_args("debug", "server", cfg)[-1] == "-debugFlag"
+    assert build_args("normal", "server", cfg)[-1] == "-normalFlag"
+
+
+def test_old_params_migrate_to_debug(tmp_path):
+    import json
+    path = tmp_path / "config.json"
+    save(load(path), path)
+    data = json.loads(path.read_text())
+    data["server_params"] = ["-legacyFlag"]   # pre-per-mode config
+    del data["server_params_debug"]
+    path.write_text(json.dumps(data))
+    cfg = load(path)
+    assert cfg.server_params_debug == ["-legacyFlag"]      # migrated
+    assert cfg.server_params_normal == DEFAULTS["server_params_normal"]
 
 
 def test_client_includes_connect_and_name(tmp_path):
