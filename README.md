@@ -180,6 +180,12 @@ side (it kills by PID). `dzl status --json` + `dzl logs <which> --lines N` give 
 script or an AI assistant the full picture (paths, mods, running state, log
 files) and a one-shot log read, without it needing to hunt for anything.
 
+**Claude Code skill:** `skill/` ships a skill that teaches an assistant the
+`dzl` CLI and the collaboration model, so it can start/restart the server and
+read logs for you while you watch in the TUI. Install it once with
+`powershell -ExecutionPolicy Bypass -File skill\install.ps1` and start a new
+Claude Code session.
+
 ## Config & presets
 
 - `config.json` (gitignored) holds your paths, port, mission, mod selection,
