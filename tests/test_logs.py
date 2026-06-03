@@ -78,3 +78,16 @@ def test_tail_lines_should_stop_unblocks_quiet_follower(tmp_path):
     t.join(timeout=2)
     assert not t.is_alive()  # exited cleanly, no hang
     assert seen == ["only"]
+
+
+from launcher.logs import last_lines
+
+
+def test_last_lines_returns_tail(tmp_path):
+    f = tmp_path / "script_x.log"
+    f.write_text("".join(f"line{i}\n" for i in range(1, 11)), encoding="utf-8")
+    assert last_lines(f, 3) == ["line8", "line9", "line10"]
+
+
+def test_last_lines_missing_file(tmp_path):
+    assert last_lines(tmp_path / "nope.log", 5) == []

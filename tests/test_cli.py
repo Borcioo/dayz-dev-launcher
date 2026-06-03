@@ -89,3 +89,28 @@ def test_config_edits_go_to_active_preset(tmp_path):
     r.invoke(cli, ["--config", str(path), "config", "set", "port", "2750"])
     cfg, _, name = resolve_active(path)
     assert name == "alpha" and cfg.port == 2750
+
+
+import json as _json
+
+
+def test_status_json_shape(tmp_path):
+    path = _seed(tmp_path)
+    res = CliRunner().invoke(cli, ["--config", str(path), "status", "--json"])
+    assert res.exit_code == 0
+    data = _json.loads(res.output)
+    assert data["server"]["state"] == "down"
+    assert "dayz_path" in data["paths"]
+    assert "mods" in data and "logs" in data
+    assert data["port"] == load(path).port
+
+
+def test_logs_lines_oneshot(tmp_path):
+    path = _seed(tmp_path)
+    cfg = load(path)
+    prof = tmp_path / "prof"; prof.mkdir()
+    (prof / "script_x.log").write_text("a\nb\nc\n", encoding="utf-8")
+    cfg.profiles_path = str(prof); save(cfg, path)
+    res = CliRunner().invoke(cli, ["--config", str(path), "logs", "script", "--lines", "2"])
+    assert res.exit_code == 0
+    assert res.output.strip().splitlines() == ["b", "c"]

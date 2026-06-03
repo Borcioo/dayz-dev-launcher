@@ -1,4 +1,4 @@
-from launcher.config import load
+from launcher.config import load, save, DEFAULTS
 from launcher import launch as launch_mod
 from launcher.launch import build_args, mod_paths_string, open_folder, open_log_window
 
@@ -64,14 +64,35 @@ def test_client_uses_separate_profiles_dir(tmp_path):
 
 def test_build_args_appends_editable_params(tmp_path):
     cfg = _cfg(tmp_path)
-    cfg.server_params = ["-customFlag", "-freezecheck"]
-    cfg.client_params = ["-window", "-myClientFlag"]
+    cfg.server_params_debug = ["-customFlag", "-freezecheck"]
+    cfg.client_params_debug = ["-window", "-myClientFlag"]
     srv = build_args("debug", "server", cfg)
     cli = build_args("debug", "client", cfg)
     assert srv[-2:] == ["-customFlag", "-freezecheck"]  # appended after core
     assert "-server" in srv
     assert cli[-2:] == ["-window", "-myClientFlag"]
     assert "-connect=127.0.0.1" in cli
+
+
+def test_params_are_per_mode(tmp_path):
+    cfg = _cfg(tmp_path)
+    cfg.server_params_debug = ["-debugFlag"]
+    cfg.server_params_normal = ["-normalFlag"]
+    assert build_args("debug", "server", cfg)[-1] == "-debugFlag"
+    assert build_args("normal", "server", cfg)[-1] == "-normalFlag"
+
+
+def test_old_params_migrate_to_debug(tmp_path):
+    import json
+    path = tmp_path / "config.json"
+    save(load(path), path)
+    data = json.loads(path.read_text())
+    data["server_params"] = ["-legacyFlag"]   # pre-per-mode config
+    del data["server_params_debug"]
+    path.write_text(json.dumps(data))
+    cfg = load(path)
+    assert cfg.server_params_debug == ["-legacyFlag"]      # migrated
+    assert cfg.server_params_normal == DEFAULTS["server_params_normal"]
 
 
 def test_client_includes_connect_and_name(tmp_path):
@@ -107,3 +128,126 @@ def test_open_log_window_spawns_for_existing(tmp_path, monkeypatch):
     assert open_log_window(f) is True
     cmd = calls["a"][0][0]
     assert "Get-Content" in cmd and str(f) in cmd
+
+
+from launcher.launch import (
+    procs_path, read_procs, write_proc, clear_proc, is_pid_alive,
+)
+
+
+def test_procs_path_next_to_config(tmp_path):
+    cfg_path = tmp_path / "config.json"
+    assert procs_path(cfg_path) == tmp_path / ".dzl-procs.json"
+
+
+def test_write_read_clear_proc(tmp_path):
+    cfg_path = tmp_path / "config.json"
+    import os
+    from launcher.launch import pid_image
+    real_exe = pid_image(os.getpid()) or "python.exe"
+    write_proc(cfg_path, "server", os.getpid(), "debug", "tui", real_exe)
+    procs = read_procs(cfg_path)
+    assert procs["server"]["pid"] == os.getpid()
+    assert procs["server"]["source"] == "tui"
+    clear_proc(cfg_path, "server")
+    assert "server" not in read_procs(cfg_path)
+
+
+def test_read_procs_reconciles_dead_pid(tmp_path, monkeypatch):
+    cfg_path = tmp_path / "config.json"
+    write_proc(cfg_path, "server", 999999, "debug", "cli", "DayZDiag_x64.exe")
+    monkeypatch.setattr(launch_mod, "pid_image", lambda pid: None)
+    assert read_procs(cfg_path) == {}
+
+
+def test_read_procs_drops_recycled_pid_wrong_exe(tmp_path, monkeypatch):
+    cfg_path = tmp_path / "config.json"
+    write_proc(cfg_path, "server", 4242, "debug", "cli", "DayZDiag_x64.exe")
+    monkeypatch.setattr(launch_mod, "pid_image", lambda pid: "notepad.exe")
+    assert read_procs(cfg_path) == {}
+
+
+def test_read_procs_missing_or_corrupt_is_empty(tmp_path):
+    cfg_path = tmp_path / "config.json"
+    assert read_procs(cfg_path) == {}
+    procs_path(cfg_path).write_text("{ broken", encoding="utf-8")
+    assert read_procs(cfg_path) == {}
+
+
+def test_spawn_records_statefile(tmp_path, monkeypatch):
+    cfg = load(tmp_path / "config.json")
+    cfg.mods = [{"path": "P:\\@CF", "enabled": True, "side": "both"}]
+
+    class FakePopen:
+        def __init__(self, *a, **k): self.pid = 31337
+
+    monkeypatch.setattr(launch_mod.subprocess, "Popen", FakePopen)
+    monkeypatch.setattr(launch_mod, "pid_image", lambda pid: "DayZDiag_x64.exe")
+    launch_mod.spawn("debug", "server", cfg, source="cli",
+                     config_path=tmp_path / "config.json")
+    procs = launch_mod.read_procs(tmp_path / "config.json")
+    assert procs["server"]["pid"] == 31337
+    assert procs["server"]["source"] == "cli"
+    assert procs["server"]["exe"] == "DayZDiag_x64.exe"
+
+
+def test_stop_target_kills_recorded_pid(tmp_path, monkeypatch):
+    cfg = load(tmp_path / "config.json")
+    launch_mod.write_proc(tmp_path / "config.json", "server", 4242,
+                          "debug", "cli", "DayZDiag_x64.exe")
+    killed = {}
+    monkeypatch.setattr(launch_mod.subprocess, "run",
+                        lambda *a, **k: killed.setdefault("args", a[0]))
+    launch_mod.stop_target("server", cfg, tmp_path / "config.json")
+    assert "/PID" in killed["args"] and "4242" in killed["args"]
+    assert "server" not in _json_load(tmp_path / "config.json")
+
+
+def _json_load(cfg_path):
+    import json
+    p = cfg_path.parent / ".dzl-procs.json"
+    return json.loads(p.read_text()) if p.exists() else {}
+
+
+def test_server_flag_only_in_debug(tmp_path):
+    cfg = _cfg(tmp_path)
+    assert "-server" in build_args("debug", "server", cfg)
+    assert "-server" not in build_args("normal", "server", cfg)
+
+
+def test_profiles_relative_when_under_dayz(tmp_path):
+    cfg = load(tmp_path / "config.json")
+    cfg.dayz_path = r"E:\DayZ"
+    cfg.profiles_path = r"E:\DayZ\profiles"
+    args = build_args("debug", "server", cfg)
+    assert "-profiles=profiles" in args
+
+
+def test_profiles_absolute_when_outside_dayz(tmp_path):
+    cfg = load(tmp_path / "config.json")
+    cfg.dayz_path = r"E:\DayZ"
+    cfg.profiles_path = r"D:\custom\prof"
+    args = build_args("debug", "server", cfg)
+    assert r"-profiles=D:\custom\prof" in args
+
+
+def test_client_uses_configurable_connect_ip(tmp_path):
+    cfg = _cfg(tmp_path)
+    cfg.connect_ip = "10.0.0.5"
+    assert "-connect=10.0.0.5" in build_args("debug", "client", cfg)
+
+
+def test_spawn_uses_absolute_exe_path(tmp_path, monkeypatch):
+    cfg = _cfg(tmp_path)
+    cfg.dayz_path = r"E:\DayZ"
+    cfg.exe_debug = r"D:\Gry\DayZServer\DayZServer_x64.exe"  # exe in another folder
+    captured = {}
+
+    class FakePopen:
+        def __init__(self, cmd, **k):
+            captured["exe"] = cmd[0]
+            self.pid = 1
+
+    monkeypatch.setattr(launch_mod.subprocess, "Popen", FakePopen)
+    launch_mod.spawn("debug", "server", cfg)  # config_path=None -> no statefile
+    assert captured["exe"] == r"D:\Gry\DayZServer\DayZServer_x64.exe"

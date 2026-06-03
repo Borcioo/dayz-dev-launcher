@@ -24,16 +24,21 @@ DEFAULTS = {
     "mission": "./mpmissions/dayzOffline.chernarusplus",
     "player_name": "DevMacie",
     "config_name": "serverDZ.cfg",
+    "connect_ip": "127.0.0.1",  # client -connect target
     "mods": [],
     "logs_shown": ["script", "rpt", "adm", "client"],
     "mode": "debug",
+    "mod_width_idx": 0,  # mods column width step (0=narrow 1=med 2=wide)
     "active_preset": "",  # name of the preset to load on startup ("" = none)
-    # extra launch flags appended after the core args (editable in the UI).
-    # core args (-server/-profiles/-mod/-config/-port/-mission/-connect/-name)
-    # are always built from config; these are everything else.
-    "server_params": ["-filePatching", "-dologs", "-adminLog", "-freezecheck"],
-    "client_params": ["-window", "-nosplash", "-filePatching", "-doLogs",
-                      "-scriptDebug=true"],
+    # extra launch flags appended after the core args (editable in the UI),
+    # per mode so dev (debug) and prod (normal) keep their own sets. core args
+    # (-server/-profiles/-mod/-config/-port/-mission/-connect/-name) are built
+    # from config; these are everything else.
+    "server_params_debug": ["-filePatching", "-dologs", "-adminLog", "-freezecheck"],
+    "server_params_normal": ["-dologs", "-adminLog", "-freezecheck"],
+    "client_params_debug": ["-window", "-nosplash", "-filePatching", "-doLogs",
+                            "-scriptDebug=true"],
+    "client_params_normal": ["-window", "-nosplash"],
 }
 
 DEFAULT_PATH = Path(__file__).resolve().parent.parent / "config.json"
@@ -54,19 +59,32 @@ class Config:
     mission: str
     player_name: str
     config_name: str
+    connect_ip: str = "127.0.0.1"
     mods: list[dict] = field(default_factory=list)
     logs_shown: list[str] = field(default_factory=list)
     mode: str = "debug"
+    mod_width_idx: int = 0
     active_preset: str = ""
-    server_params: list[str] = field(default_factory=list)
-    client_params: list[str] = field(default_factory=list)
+    server_params_debug: list[str] = field(default_factory=list)
+    server_params_normal: list[str] = field(default_factory=list)
+    client_params_debug: list[str] = field(default_factory=list)
+    client_params_normal: list[str] = field(default_factory=list)
 
 
 def load(path: Path = DEFAULT_PATH) -> Config:
-    data = dict(DEFAULTS)
     path = Path(path)
+    saved = {}
     if path.exists():
-        data.update(json.loads(path.read_text(encoding="utf-8")))
+        saved = json.loads(path.read_text(encoding="utf-8"))
+    data = dict(DEFAULTS)
+    data.update(saved)
+    # migrate pre-per-mode params: the old single list becomes the debug set
+    # (debug was the default); the normal set keeps its default. Check the SAVED
+    # keys, not the merged data (which always has the new keys from DEFAULTS).
+    if "server_params" in saved and "server_params_debug" not in saved:
+        data["server_params_debug"] = saved["server_params"]
+    if "client_params" in saved and "client_params_debug" not in saved:
+        data["client_params_debug"] = saved["client_params"]
     # keep only known keys, fill any missing with defaults
     known = {k: data.get(k, DEFAULTS[k]) for k in DEFAULTS}
     return Config(**known)
@@ -83,7 +101,7 @@ def save(cfg: Config, path: Path = DEFAULT_PATH) -> None:
 EDITABLE_SCALARS = (
     "dayz_path", "dayz_tools_path", "profiles_path", "client_profiles_path",
     "exe_debug", "exe_normal", "client_exe_debug", "client_exe_normal",
-    "port", "mission", "player_name", "config_name",
+    "port", "mission", "player_name", "config_name", "connect_ip",
 )
 
 

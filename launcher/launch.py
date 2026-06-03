@@ -1,11 +1,95 @@
 """Build the launch argv (pure) and manage server/client processes."""
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 from pathlib import Path
 
 from .config import Config
+
+
+def procs_path(config_path) -> Path:
+    """The PID statefile lives next to config.json."""
+    return Path(config_path).parent / ".dzl-procs.json"
+
+
+def pid_image(pid: int):
+    """Return the image (exe) name for a PID, or None if not running."""
+    out = subprocess.run(
+        ["tasklist", "/FI", f"PID eq {pid}", "/NH", "/FO", "CSV"],
+        capture_output=True, text=True,
+    )
+    line = out.stdout.strip()
+    if not line or line.upper().startswith("INFO:"):
+        return None
+    return line.split('","')[0].strip('"')
+
+
+def is_pid_alive(pid: int) -> bool:
+    return pid_image(pid) is not None
+
+
+def read_procs(config_path) -> dict:
+    """Load the statefile and reconcile: keep only entries whose PID is still
+    alive AND still the recorded exe. Missing/corrupt -> {}."""
+    p = procs_path(config_path)
+    try:
+        data = json.loads(p.read_text(encoding="utf-8"))
+    except (FileNotFoundError, ValueError, OSError):
+        return {}
+    if not isinstance(data, dict):
+        return {}
+    live = {}
+    changed = False
+    for target, info in data.items():
+        try:
+            pid = int(info["pid"])
+        except (KeyError, TypeError, ValueError):
+            changed = True
+            continue
+        img = pid_image(pid)
+        if img is not None and img.lower() == str(info.get("exe", "")).lower():
+            live[target] = info
+        else:
+            changed = True
+    if changed:
+        _write_procs(config_path, live)
+    return live
+
+
+def _write_procs(config_path, data: dict) -> None:
+    p = procs_path(config_path)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(json.dumps(data, indent=2), encoding="utf-8")
+
+
+def write_proc(config_path, target: str, pid: int, mode: str,
+               source: str, exe: str) -> None:
+    data = {}
+    p = procs_path(config_path)
+    if p.exists():
+        try:
+            data = json.loads(p.read_text(encoding="utf-8"))
+            if not isinstance(data, dict):
+                data = {}
+        except (ValueError, OSError):
+            data = {}
+    data[target] = {"pid": pid, "mode": mode, "source": source, "exe": exe}
+    _write_procs(config_path, data)
+
+
+def clear_proc(config_path, target: str) -> None:
+    p = procs_path(config_path)
+    if not p.exists():
+        return
+    try:
+        data = json.loads(p.read_text(encoding="utf-8"))
+    except (ValueError, OSError):
+        return
+    if isinstance(data, dict) and target in data:
+        del data[target]
+        _write_procs(config_path, data)
 
 
 def open_folder(path) -> bool:
@@ -41,6 +125,16 @@ def _join(paths: list[str]) -> str:
     return ";".join(paths)
 
 
+def _profiles_arg(path, dayz) -> str:
+    """`-profiles=` value: relative to the DayZ dir when the profiles dir lives
+    under it, else the absolute path (a bare name would resolve against cwd)."""
+    p = Path(path)
+    try:
+        return str(p.relative_to(Path(dayz)))
+    except ValueError:
+        return str(p)
+
+
 def mods_for_target(cfg: Config, target: str) -> list[str]:
     """The ``-mod=`` list for a target, by per-mod side:
     - server gets ``both`` mods (server-only go to ``-serverMod``);
@@ -63,6 +157,15 @@ def server_only_mods(cfg: Config) -> list[str]:
             if m.get("enabled") and m.get("side", "both") == "server"]
 
 
+def params_attr(target: str, mode: str) -> str:
+    """The config attribute holding the editable flags for (target, mode)."""
+    return f"{target}_params_{mode}"
+
+
+def params_for(cfg: Config, target: str, mode: str) -> list:
+    return list(getattr(cfg, params_attr(target, mode)))
+
+
 def server_exe(cfg: Config, mode: str) -> str:
     return cfg.exe_debug if mode == "debug" else cfg.exe_normal
 
@@ -75,14 +178,15 @@ def build_args(mode: str, target: str, cfg: Config) -> list[str]:
     """Full argv for a (mode, target). Core args are built from config; the rest
     are the editable cfg.server_params / cfg.client_params. Pure: no side
     effects. (mode selects the exe elsewhere; it doesn't change the args here.)"""
-    # -profiles is relative to the DayZ dir (spawn cwd); use each configured
-    # dir's basename so server and client write to separate profile trees and
-    # their logs never collide.
-    server_profiles = Path(cfg.profiles_path).name
-    client_profiles = Path(cfg.client_profiles_path).name
+    server_profiles = _profiles_arg(cfg.profiles_path, cfg.dayz_path)
+    client_profiles = _profiles_arg(cfg.client_profiles_path, cfg.dayz_path)
     if target == "server":
-        args = [
-            "-server",
+        args = []
+        # -server makes DayZDiag/DayZ_x64 run as a server; the dedicated
+        # DayZServer_x64.exe IS the server and must NOT receive -server.
+        if mode == "debug":
+            args.append("-server")
+        args += [
             f"-profiles={server_profiles}",
             f"-mod={_join(mods_for_target(cfg, 'server'))}",
             f"-config={cfg.config_name}",
@@ -91,17 +195,17 @@ def build_args(mode: str, target: str, cfg: Config) -> list[str]:
         server_only = server_only_mods(cfg)
         if server_only:
             args.append(f"-serverMod={_join(server_only)}")
-        return args + list(cfg.server_params)
+        return args + list(params_for(cfg, "server", mode))
     if target == "client":
         args = [
             f"-profiles={client_profiles}",
             f"-mod={_join(mods_for_target(cfg, 'client'))}",
             f"-mission={cfg.mission}",
-            "-connect=127.0.0.1",
+            f"-connect={cfg.connect_ip}",
             f"-port={cfg.port}",
             f"-name={cfg.player_name}",
         ]
-        return args + list(cfg.client_params)
+        return args + list(params_for(cfg, "client", mode))
     raise ValueError(f"unknown target: {target}")
 
 
@@ -119,12 +223,46 @@ def stop(exe: str) -> None:
     subprocess.run(["taskkill", "/F", "/IM", exe], capture_output=True, text=True)
 
 
-def spawn(mode: str, target: str, cfg: Config) -> subprocess.Popen:
+def spawn(mode: str, target: str, cfg: Config, *, source: str = "cli",
+          config_path=None) -> subprocess.Popen:
     exe = server_exe(cfg, mode) if target == "server" else client_exe(cfg, mode)
     cmd = [str(Path(cfg.dayz_path) / exe), *build_args(mode, target, cfg)]
-    return subprocess.Popen(cmd, cwd=cfg.dayz_path)
+    proc = subprocess.Popen(cmd, cwd=cfg.dayz_path)
+    if config_path is not None:
+        write_proc(config_path, target, proc.pid, mode, source, exe)
+    return proc
 
 
-def restart_server(mode: str, cfg: Config) -> subprocess.Popen:
-    stop(server_exe(cfg, mode))
-    return spawn(mode, "server", cfg)
+def _raw_procs(config_path) -> dict:
+    """Read the statefile as-is without any live-PID reconciliation."""
+    p = procs_path(config_path)
+    try:
+        data = json.loads(p.read_text(encoding="utf-8"))
+        return data if isinstance(data, dict) else {}
+    except (FileNotFoundError, ValueError, OSError):
+        return {}
+
+
+def stop_target(target: str, cfg: Config, config_path) -> None:
+    """Stop a target by the PID recorded in the statefile (works no matter who
+    started it; required in debug where server and client share DayZDiag). Falls
+    back to image-name kill if nothing is recorded."""
+    procs = _raw_procs(config_path)
+    info = procs.get(target)
+    if info:
+        subprocess.run(["taskkill", "/F", "/PID", str(info["pid"])],
+                       capture_output=True, text=True)
+    else:
+        mode = (info or {}).get("mode", cfg.mode)
+        exe = server_exe(cfg, mode) if target == "server" else client_exe(cfg, mode)
+        stop(exe)
+    clear_proc(config_path, target)
+
+
+def restart_server(mode: str, cfg: Config, config_path=None,
+                   source: str = "cli") -> subprocess.Popen:
+    if config_path is not None:
+        stop_target("server", cfg, config_path)
+    else:
+        stop(server_exe(cfg, mode))
+    return spawn(mode, "server", cfg, source=source, config_path=config_path)

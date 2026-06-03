@@ -138,6 +138,9 @@ dzl start --normal            # DayZServer (needs packed PBOs)
 dzl stop --client
 dzl restart
 dzl logs script               # tail a log to stdout (Ctrl+C to stop)
+dzl logs script --lines 100   # print the last N lines and exit (no follow)
+dzl status                    # running state + paths + mods + logs
+dzl status --json             # ...machine-readable (for tools/agents)
 dzl config                    # print the whole config as JSON
 dzl config set port 2402
 dzl config add-root D:\my\mods
@@ -158,13 +161,30 @@ dzl preset load chernarus-hc
 ```
 server   s start · x stop · r restart
 client   Ctrl+S start · Ctrl+X stop · Ctrl+R restart   (Ctrl mirrors server)
-mods     t cycle side · Ctrl+↑/↓ reorder · a rescan
+mods     t cycle side · Ctrl+↑/↓ reorder · Ctrl+Home/End to top/bottom
+         a rescan · / search · f enabled-only · = widen column
 logs     (focus a pane with Tab/click) z collapse · Ctrl+↑/↓ move · w pop out
 other    d debug/normal · c config · p presets · o open a folder · q quit
 ```
 
 The control rows at the bottom mirror these as buttons, plus **Params** to edit
 each target's launch flags.
+
+## Human + tool, same launcher
+
+The CLI and the TUI share one source of truth (a `.dzl-procs.json` statefile next
+to your config), so you can drive the launcher from a terminal/script while the
+TUI is open and both stay in sync. The status bar shows who started what —
+`server: UP (cli)` vs `(tui)` — and Stop works on a server started from either
+side (it kills by PID). `dzl status --json` + `dzl logs <which> --lines N` give a
+script or an AI assistant the full picture (paths, mods, running state, log
+files) and a one-shot log read, without it needing to hunt for anything.
+
+**Claude Code skill:** `skill/` ships a skill that teaches an assistant the
+`dzl` CLI and the collaboration model, so it can start/restart the server and
+read logs for you while you watch in the TUI. Install it once with
+`powershell -ExecutionPolicy Bypass -File skill\install.ps1` and start a new
+Claude Code session.
 
 ## Config & presets
 

@@ -165,6 +165,7 @@ class ConfigScreen(ModalScreen):
         ("port", "Port"),
         ("mission", "Mission"),
         ("player_name", "Player name"),
+        ("connect_ip", "Client connect IP"),
     ]
 
     def __init__(self, cfg: config_mod.Config):
@@ -198,20 +199,17 @@ class ConfigScreen(ModalScreen):
             self.query_one(f"#cfg-{key}", Input).value = path
 
     def _set_filename(self, key: str, path) -> None:
-        # exe fields store just the filename (they live in the DayZ dir, the
-        # spawn cwd). The server config can live anywhere, so keep its path:
-        # relative to the DayZ dir when under it, absolute otherwise — a bare
-        # filename would otherwise be looked for in the spawn cwd and fail.
+        # exe / config files: keep just the name when they live under the DayZ
+        # dir (the spawn cwd), but an absolute path when they're elsewhere — so
+        # an exe or config in another folder can be pointed at directly. A bare
+        # name would otherwise be looked for in the cwd and fail.
         if not path:
             return
-        if key == "config_name":
-            p = Path(path)
-            try:
-                val = str(p.relative_to(Path(self.cfg.dayz_path)))
-            except ValueError:
-                val = str(p)
-        else:
-            val = Path(path).name
+        p = Path(path)
+        try:
+            val = str(p.relative_to(Path(self.cfg.dayz_path)))
+        except ValueError:
+            val = str(p)
         self.query_one(f"#cfg-{key}", Input).value = val
 
     def _set_mission(self, path) -> None:
@@ -344,10 +342,11 @@ class ParamsScreen(ModalScreen):
     """
     BINDINGS = [("escape", "cancel", "Cancel")]
 
-    def __init__(self, label: str, params: list[str]):
+    def __init__(self, label: str, params: list[str], defaults: list[str]):
         super().__init__()
         self.label_text = label
         self.params = params
+        self.defaults = defaults
 
     def compose(self) -> ComposeResult:
         with Vertical(id="paramsbox"):
@@ -355,6 +354,7 @@ class ParamsScreen(ModalScreen):
                         "(core -mod/-port/etc. are added automatically)")
             yield TextArea("\n".join(self.params), id="params-text")
             with Horizontal(id="paramsbtns"):
+                yield Button("Reset", id="params-reset")
                 yield Button("Save", variant="success", id="params-save")
                 yield Button("Cancel", id="params-cancel")
 
@@ -364,6 +364,9 @@ class ParamsScreen(ModalScreen):
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "params-cancel":
             self.dismiss(None)
+            return
+        if event.button.id == "params-reset":
+            self.query_one("#params-text", TextArea).text = "\n".join(self.defaults)
             return
         lines = [ln.strip() for ln in
                  self.query_one("#params-text", TextArea).text.splitlines()]
@@ -404,13 +407,19 @@ class OpenScreen(ModalScreen):
 class DzlApp(App):
     CSS = """
     #main { height: 1fr; }
-    #mods { width: 15%; min-width: 26; border: round $accent; height: 1fr; }
+    #modcol { width: 15%; min-width: 26; }
+    #mod-searchrow { height: 3; }
+    #mod-search { width: 1fr; border: round $accent; background: transparent; }
+    #mod-search:focus { border: round $accent-lighten-1; }
+    #mod-clear {
+        width: 5; min-width: 5; height: 3; margin-left: 1;
+        border: round $accent; background: transparent;
+    }
+    #mods { border: round $accent; height: 1fr; overflow-x: auto; }
     #right { width: 1fr; }
     #bottom { height: auto; }
-    #preview {
-        border: round $warning; height: auto; max-height: 8;
-        padding: 0 1; color: $text-muted;
-    }
+    #preview { border: round $warning; height: auto; max-height: 8; padding: 0 1; }
+    #preview-text { color: $text-muted; width: 1fr; }
     .pane { border: round $primary; height: 1fr; }
     .pane:focus { border: round $accent; }
     .pane.collapsed { height: 3; }  /* title bar only */
@@ -430,7 +439,7 @@ class DzlApp(App):
     KEYBAR = (
         "[b $success]SRV[/] s·start x·stop r·restart"
         "   [b $success]CLI[/] ^s·start ^x·stop ^r·restart"
-        "   [b $accent]MODS[/] t·side ^↑/^↓·order a·rescan"
+        "   [b $accent]MODS[/] t·side ^↑/^↓·order a·rescan /·search f·enabled =·width ^Home/^End·top/bottom"
         "   [b $primary]LOG[/] z·collapse ^↑/^↓·move w·window"
         "   [b $warning]SET[/] d·mode c·config p·presets o·open · q·quit"
     )
@@ -447,6 +456,11 @@ class DzlApp(App):
         ("t", "cycle_side", "side"),
         ("ctrl+up", "move_up", "move up"),
         ("ctrl+down", "move_down", "move down"),
+        ("/", "search", "search mods"),
+        ("f", "filter_enabled", "enabled only"),
+        ("=", "cycle_width", "widen mods"),
+        ("ctrl+home", "move_top", "move to top"),
+        ("ctrl+end", "move_bottom", "move to bottom"),
         ("z", "toggle_collapse", "collapse pane"),
         ("w", "pop_log", "log in new window"),
         # settings
@@ -466,21 +480,25 @@ class DzlApp(App):
         self.config_path = config_path  # config.json (holds the active pointer)
         self.active_preset = active_preset
         self.mode = cfg.mode
-        # processes WE spawned, tracked by PID so server/client are
-        # distinguishable even when both are the same DayZDiag exe in debug
-        self.server_proc = None
-        self.client_proc = None
         # scan on open so the list is current (saved loadout + newly-found mods,
         # the new ones disabled). Press 'a' to rescan after changing scan-roots.
         self.mod_list = mods_mod.merge(cfg.mods, mods_mod.discover(cfg.scan_roots))
+        self.mod_filter = ""        # substring filter
+        self.enabled_only = False   # show only enabled mods
+        self.mod_width_idx = cfg.mod_width_idx % 3  # persisted width step
 
     def compose(self) -> ComposeResult:
         yield Header()
         with Horizontal(id="main"):
-            with VerticalScroll(id="mods"):
-                for i, m in enumerate(self.mod_list):
-                    yield Checkbox(self._mod_label(i, m),
-                                   value=m.enabled, id=f"mod-{i}")
+            with Vertical(id="modcol"):
+                with Horizontal(id="mod-searchrow"):
+                    yield Input(placeholder="filter mods…", id="mod-search")
+                    yield Button("✕", id="mod-clear")
+                with VerticalScroll(id="mods"):
+                    for i in self._visible_indices():
+                        m = self.mod_list[i]
+                        yield Checkbox(self._mod_label(i, m), value=m.enabled,
+                                       id=f"mod-{i}")
             with Vertical(id="right"):
                 yield Static(self._status_text(), id="bar")
                 for which in self.cfg.logs_shown:
@@ -488,7 +506,8 @@ class DzlApp(App):
                                   highlight=False, wrap=False)
         # full-width bottom strip: live argv preview + the start/stop controls
         with Vertical(id="bottom"):
-            yield Static(self._preview_text(), id="preview")
+            with VerticalScroll(id="preview"):
+                yield Static(self._preview_text(), id="preview-text")
             with Vertical(id="controls"):
                 with Horizontal(classes="ctlrow"):
                     yield Label("SERVER", classes="grp")
@@ -506,36 +525,35 @@ class DzlApp(App):
 
     def on_mount(self) -> None:
         self.sub_title = f"{self.mode} mode"
+        self.query_one("#modcol").styles.width = self._MOD_WIDTHS[self.mod_width_idx]
+        self.query_one("#mod-search", Input).border_title = "search mods"
         self.query_one("#mods").border_title = "mods"
         self.query_one("#bar", Static).border_title = "status"
         self._refresh_preview()
+        self.set_interval(1.5, self._refresh_status)
         for which in self.cfg.logs_shown:
             pane = self.query_one(f"#log-{which}", RichLog)
             pane.can_focus = True  # so it can be selected for z / move
             pane.border_title = f"{which.upper()}  ·z ·^↑↓"
             self._tail_into(which)
+        # don't auto-focus the filter Input (first focusable) — keep focus on
+        # the app so single-key shortcuts work until the user clicks the box.
+        self.call_after_refresh(self.set_focus, None)
 
     def on_checkbox_changed(self, event: Checkbox.Changed) -> None:
         # toggling a mod changes the launch argv -> keep the preview live
         self._refresh_preview()
 
     # ---- helpers ----
-    @staticmethod
-    def _proc_state(proc) -> str:
-        return "UP" if (proc is not None and proc.poll() is None) else "down"
-
     def _status_text(self) -> str:
-        return (f"mode: {self.mode}   port: {self.cfg.port}   "
-                f"server: {self._proc_state(self.server_proc)}   "
-                f"client: {self._proc_state(self.client_proc)}")
+        procs = launch_mod.read_procs(self.config_path)
 
-    def _kill(self, proc, exe: str):
-        """Stop a process we spawned by PID (so we don't take down the other
-        DayZDiag instance in debug). Fall back to image-name kill if untracked."""
-        if proc is not None and proc.poll() is None:
-            proc.terminate()
-        else:
-            launch_mod.stop(exe)
+        def fmt(t):
+            info = procs.get(t)
+            return f"UP ({info['source']})" if info else "down"
+
+        return (f"mode: {self.mode}   port: {self.cfg.port}   "
+                f"server: {fmt('server')}   client: {fmt('client')}")
 
     def _refresh_status(self) -> None:
         self.query_one("#bar", Static).update(self._status_text())
@@ -575,9 +593,9 @@ class DzlApp(App):
         return f"SERVER  {srv}\n\nCLIENT  {cli}"
 
     def _refresh_preview(self) -> None:
-        preview = self.query_one("#preview", Static)
+        preview = self.query_one("#preview", VerticalScroll)
         preview.border_title = f"launch params · {self.mode}"
-        preview.update(self._preview_text())
+        self.query_one("#preview-text", Static).update(self._preview_text())
 
     def _sync_mods_from_ui(self) -> None:
         self.cfg.mods = self._enabled_selection()
@@ -620,39 +638,46 @@ class DzlApp(App):
 
         self.run_worker(pump, thread=True, name=f"tail-{which}")
 
+    _MOD_WIDTHS = ("15%", "35%", "60%")
+
+    def action_cycle_width(self) -> None:
+        self.mod_width_idx = (self.mod_width_idx + 1) % len(self._MOD_WIDTHS)
+        self.query_one("#modcol").styles.width = self._MOD_WIDTHS[self.mod_width_idx]
+        self.cfg.mod_width_idx = self.mod_width_idx
+        config_mod.save(self.cfg, self.save_path)
+
     # ---- actions ----
     def action_start(self) -> None:
         self._sync_mods_from_ui()
-        self.server_proc = launch_mod.spawn(self.mode, "server", self.cfg)
+        launch_mod.spawn(self.mode, "server", self.cfg,
+                         source="tui", config_path=self.config_path)
         self._refresh_status()
 
     def action_start_client(self) -> None:
-        # launch the client with the same enabled mods, auto-connecting to the
-        # local server (build_args adds -connect/-name/-window for the client)
         self._sync_mods_from_ui()
-        self.client_proc = launch_mod.spawn(self.mode, "client", self.cfg)
+        launch_mod.spawn(self.mode, "client", self.cfg,
+                         source="tui", config_path=self.config_path)
         self._refresh_status()
 
     def action_stop(self) -> None:
-        self._kill(self.server_proc, launch_mod.server_exe(self.cfg, self.mode))
-        self.server_proc = None
+        launch_mod.stop_target("server", self.cfg, self.config_path)
         self._refresh_status()
 
     def action_restart(self) -> None:
         self._sync_mods_from_ui()
-        self._kill(self.server_proc, launch_mod.server_exe(self.cfg, self.mode))
-        self.server_proc = launch_mod.spawn(self.mode, "server", self.cfg)
+        launch_mod.restart_server(self.mode, self.cfg,
+                                  config_path=self.config_path, source="tui")
         self._refresh_status()
 
     def action_stop_client(self) -> None:
-        self._kill(self.client_proc, launch_mod.client_exe(self.cfg, self.mode))
-        self.client_proc = None
+        launch_mod.stop_target("client", self.cfg, self.config_path)
         self._refresh_status()
 
     def action_restart_client(self) -> None:
         self._sync_mods_from_ui()
-        self._kill(self.client_proc, launch_mod.client_exe(self.cfg, self.mode))
-        self.client_proc = launch_mod.spawn(self.mode, "client", self.cfg)
+        launch_mod.stop_target("client", self.cfg, self.config_path)
+        launch_mod.spawn(self.mode, "client", self.cfg,
+                         source="tui", config_path=self.config_path)
         self._refresh_status()
 
     # control-bar buttons -> the matching action (keyboard still works too)
@@ -664,6 +689,9 @@ class DzlApp(App):
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         bid = event.button.id
+        if bid == "mod-clear":
+            self._clear_filter()
+            return
         if bid in ("srv-params", "cli-params"):
             self._open_params("server" if bid == "srv-params" else "client")
             return
@@ -672,23 +700,23 @@ class DzlApp(App):
             getattr(self, f"action_{action}")()
 
     def _open_params(self, target: str) -> None:
-        current = (self.cfg.server_params if target == "server"
-                   else self.cfg.client_params)
+        # edit the flag set for THIS mode (debug/normal kept separate)
+        key = launch_mod.params_attr(target, self.mode)
+        current = getattr(self.cfg, key)
+        defaults = config_mod.DEFAULTS[key]
         self.push_screen(
-            ParamsScreen(target.upper(), list(current)),
-            lambda result: self._apply_params(target, result),
+            ParamsScreen(f"{target.upper()} ({self.mode})", list(current),
+                         list(defaults)),
+            lambda result: self._apply_params(key, target, result),
         )
 
-    def _apply_params(self, target: str, result) -> None:
+    def _apply_params(self, key: str, target: str, result) -> None:
         if result is None:
             return
-        if target == "server":
-            self.cfg.server_params = result
-        else:
-            self.cfg.client_params = result
+        setattr(self.cfg, key, result)
         config_mod.save(self.cfg, self.save_path)
         self._refresh_preview()
-        self.notify(f"{target} params updated")
+        self.notify(f"{target} params ({self.mode}) updated")
 
     def action_toggle_mode(self) -> None:
         self.mode = "normal" if self.mode == "debug" else "debug"
@@ -754,6 +782,32 @@ class DzlApp(App):
 
     def action_rescan(self) -> None:
         self.run_worker(self._rescan(), exclusive=True)
+
+    def action_search(self) -> None:
+        # search box is always visible; '/' just jumps focus into it
+        self.query_one("#mod-search", Input).focus()
+
+    def action_filter_enabled(self) -> None:
+        self.enabled_only = not self.enabled_only
+        self.run_worker(self._rebuild_mod_widgets(), exclusive=True)
+
+    def on_input_changed(self, event: Input.Changed) -> None:
+        if event.input.id == "mod-search":
+            self.mod_filter = event.value
+            self.run_worker(self._rebuild_mod_widgets(), exclusive=True)
+
+    def _clear_filter(self) -> None:
+        self.query_one("#mod-search", Input).value = ""
+        self.mod_filter = ""
+        self.set_focus(None)
+        self.run_worker(self._rebuild_mod_widgets(), exclusive=True)
+
+    def on_key(self, event) -> None:
+        if event.key == "escape":
+            inp = self.query_one("#mod-search", Input)
+            if inp.has_focus or self.mod_filter:
+                self._clear_filter()
+                event.stop()
 
     def action_cycle_side(self) -> None:
         """Cycle the focused mod's side: both -> server -> client -> both.
@@ -837,6 +891,17 @@ class DzlApp(App):
         self.run_worker(self._rescan(), exclusive=True)
 
     # ---- reorder / rebuild ----
+    def _visible_indices(self):
+        """Indices into self.mod_list that pass the current filter."""
+        out = []
+        for i, m in enumerate(self.mod_list):
+            if self.enabled_only and not m.enabled:
+                continue
+            if self.mod_filter and self.mod_filter.lower() not in m.name.lower():
+                continue
+            out.append(i)
+        return out
+
     def _focused_mod_index(self):
         w = self.focused
         if isinstance(w, Checkbox) and w.id and w.id.startswith("mod-"):
@@ -847,8 +912,9 @@ class DzlApp(App):
         await self.query("#mods Checkbox").remove()
         box = self.query_one("#mods", VerticalScroll)
         await box.mount_all([
-            Checkbox(self._mod_label(i, m), value=m.enabled, id=f"mod-{i}")
-            for i, m in enumerate(self.mod_list)
+            Checkbox(self._mod_label(i, self.mod_list[i]),
+                     value=self.mod_list[i].enabled, id=f"mod-{i}")
+            for i in self._visible_indices()
         ])
 
     async def _move(self, delta: int) -> None:
@@ -865,6 +931,25 @@ class DzlApp(App):
         self.query_one(f"#mod-{j}", Checkbox).focus()
         self._sync_mods_from_ui()  # persist the new order (enabled selection)
         self._refresh_preview()
+
+    async def _move_to(self, where: str) -> None:
+        i = self._focused_mod_index()
+        if i is None:
+            return
+        self._sync_checkbox_state()
+        m = self.mod_list.pop(i)
+        j = 0 if where == "top" else len(self.mod_list)
+        self.mod_list.insert(j, m)
+        await self._rebuild_mod_widgets()
+        self.query_one(f"#mod-{j}", Checkbox).focus()
+        self._sync_mods_from_ui()
+        self._refresh_preview()
+
+    def action_move_top(self) -> None:
+        self.run_worker(self._move_to("top"), exclusive=True)
+
+    def action_move_bottom(self) -> None:
+        self.run_worker(self._move_to("bottom"), exclusive=True)
 
     async def _show_mod_list(self, mod_list) -> None:
         self.mod_list = mod_list
