@@ -405,7 +405,7 @@ class DzlApp(App):
     CSS = """
     #main { height: 1fr; }
     #modcol { width: 15%; min-width: 26; }
-    #mod-searchrow { height: 3; margin-bottom: 1; }
+    #mod-searchrow { height: 3; }
     #mod-search { width: 1fr; border: round $accent; background: transparent; }
     #mod-search:focus { border: round $accent-lighten-1; }
     #mod-clear {
