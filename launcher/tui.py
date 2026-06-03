@@ -523,6 +523,9 @@ class DzlApp(App):
             pane.can_focus = True  # so it can be selected for z / move
             pane.border_title = f"{which.upper()}  ·z ·^↑↓"
             self._tail_into(which)
+        # don't auto-focus the filter Input (first focusable) — keep focus on
+        # the app so single-key shortcuts work until the user clicks the box.
+        self.call_after_refresh(self.set_focus, None)
 
     def on_checkbox_changed(self, event: Checkbox.Changed) -> None:
         # toggling a mod changes the launch argv -> keep the preview live
