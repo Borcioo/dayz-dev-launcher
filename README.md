@@ -224,6 +224,9 @@ absolute (point at files in another folder), not just names inside the DayZ dir.
 
 In **normal** mode the server resolves its exe, working directory and
 `-profiles=` against `dayz_server_path` when set (empty = the client install).
+The server's cfg (when `config_name` is a bare name like `serverDZ.cfg`) and
+its `mpmissions\` tree are also resolved in that folder — keep your mission
+there for normal mode.
 Debug always runs from the client install — that's where `DayZDiag_x64.exe`
 lives.
 

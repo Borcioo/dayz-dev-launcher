@@ -20,7 +20,8 @@
   new `dayz_server_path` option points at the dedicated DayZ Server install;
   the server now launches from that directory (exe, cwd, `-profiles=`
   relativization). Empty (default) keeps the old single-install behavior;
-  debug mode is unaffected. (user report)
+  debug mode is unaffected. Note: with the option set, the server cfg (bare
+  name) and mpmissions\ are looked up in the server install too. (user report)
 
 ## 0.2.0 — human + AI collaboration, mods UX, fully editable launch
 
