@@ -118,6 +118,22 @@ python -m venv .venv
 Either way the `dzl.bat` shim uses `.venv` automatically. (You still need
 Python 3.11+ installed — see [Requirements](#requirements).)
 
+## Update
+
+Re-run the install one-liner — it detects an existing install:
+
+```powershell
+powershell -ExecutionPolicy Bypass -Command "irm https://raw.githubusercontent.com/Borcioo/dayz-dev-launcher/main/install.ps1 | iex"
+```
+
+With git installed it simply pulls the latest version in place; without git the
+folder is replaced with a fresh ZIP. Either way your `config.json` and
+`presets\` (your local setup) survive the update. See what changed in
+[CHANGELOG.md](CHANGELOG.md).
+
+If you installed manually with `git clone`, just `git pull` (and re-run
+`pip install -r requirements.txt` if requirements changed).
+
 ## Run
 
 After `setup.bat`, from any new terminal:

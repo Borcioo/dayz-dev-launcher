@@ -56,14 +56,35 @@ if (-not (Test-Python)) {
 Ok ("Python " + (& python -c "import sys;print('.'.join(map(str,sys.version_info[:3])))"))
 
 # --- 2) fetch the app -------------------------------------------------------
+# config.json / presets\ are the user's local setup (gitignored). The git-pull
+# update path never touches them, but the replace paths (re-clone / ZIP) wipe
+# $Dest — so stash them aside and put them back after the swap.
+function Save-UserData {
+    if (-not (Test-Path $Dest)) { return $null }
+    $keep = Join-Path $env:TEMP ("dzl-keep-" + [guid]::NewGuid().ToString('N'))
+    New-Item -ItemType Directory -Force -Path $keep | Out-Null
+    foreach ($item in 'config.json', 'presets') {
+        $p = Join-Path $Dest $item
+        if (Test-Path $p) { Copy-Item -Recurse $p (Join-Path $keep $item) }
+    }
+    return $keep
+}
+function Restore-UserData($keep) {
+    if (-not $keep) { return }
+    Get-ChildItem $keep | ForEach-Object { Copy-Item -Recurse -Force $_.FullName $Dest }
+    Remove-Item -Recurse -Force $keep
+}
+
 $haveGit = [bool](Get-Command git -ErrorAction SilentlyContinue)
 if ((Test-Path (Join-Path $Dest '.git')) -and $haveGit) {
     Info "Updating existing install in $Dest ..."
     Native git -C $Dest pull --ff-only
 } elseif ($haveGit) {
+    $keep = Save-UserData
     if (Test-Path $Dest) { Remove-Item -Recurse -Force $Dest }
     Info "Cloning into $Dest ..."
     Native git clone --depth 1 $RepoGit $Dest
+    Restore-UserData $keep
 } else {
     Info "Downloading to $Dest (no git found, using ZIP) ..."
     $tmp = Join-Path $env:TEMP ("dzl-" + [guid]::NewGuid().ToString('N'))
@@ -72,8 +93,10 @@ if ((Test-Path (Join-Path $Dest '.git')) -and $haveGit) {
     Invoke-WebRequest -Uri $RepoZip -OutFile $zip
     Expand-Archive -Path $zip -DestinationPath $tmp -Force
     $inner = Get-ChildItem -Directory $tmp | Where-Object { $_.Name -like 'dayz-dev-launcher-*' } | Select-Object -First 1
+    $keep = Save-UserData
     if (Test-Path $Dest) { Remove-Item -Recurse -Force $Dest }
     Move-Item $inner.FullName $Dest
+    Restore-UserData $keep
     Remove-Item -Recurse -Force $tmp
 }
 Ok "App in $Dest"
