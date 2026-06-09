@@ -132,6 +132,7 @@ def test_open_log_window_spawns_for_existing(tmp_path, monkeypatch):
 
 from launcher.launch import (
     procs_path, read_procs, write_proc, clear_proc, is_pid_alive,
+    server_base,
 )
 
 
@@ -251,3 +252,25 @@ def test_spawn_uses_absolute_exe_path(tmp_path, monkeypatch):
     monkeypatch.setattr(launch_mod.subprocess, "Popen", FakePopen)
     launch_mod.spawn("debug", "server", cfg)  # config_path=None -> no statefile
     assert captured["exe"] == r"D:\Gry\DayZServer\DayZServer_x64.exe"
+
+
+def test_server_base_normal_uses_server_install(tmp_path):
+    cfg = load(tmp_path / "config.json")
+    cfg.dayz_path = r"E:\DayZ"
+    cfg.dayz_server_path = r"E:\DayZServer"
+    assert server_base(cfg, "normal") == r"E:\DayZServer"
+
+
+def test_server_base_normal_empty_falls_back(tmp_path):
+    cfg = load(tmp_path / "config.json")
+    cfg.dayz_path = r"E:\DayZ"
+    cfg.dayz_server_path = ""
+    assert server_base(cfg, "normal") == r"E:\DayZ"
+
+
+def test_server_base_debug_ignores_server_install(tmp_path):
+    # DayZDiag_x64.exe lives in the CLIENT install — debug must not move
+    cfg = load(tmp_path / "config.json")
+    cfg.dayz_path = r"E:\DayZ"
+    cfg.dayz_server_path = r"E:\DayZServer"
+    assert server_base(cfg, "debug") == r"E:\DayZ"

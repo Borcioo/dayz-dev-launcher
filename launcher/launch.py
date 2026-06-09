@@ -174,6 +174,15 @@ def client_exe(cfg: Config, mode: str) -> str:
     return cfg.client_exe_debug if mode == "debug" else cfg.client_exe_normal
 
 
+def server_base(cfg: Config, mode: str) -> str:
+    """Base install dir for the server target: the dedicated server install in
+    normal mode (when configured), else the client install. Debug always uses
+    the client install — DayZDiag_x64.exe lives there."""
+    if mode == "normal" and cfg.dayz_server_path:
+        return cfg.dayz_server_path
+    return cfg.dayz_path
+
+
 def build_args(mode: str, target: str, cfg: Config) -> list[str]:
     """Full argv for a (mode, target). Core args are built from config; the rest
     are the editable cfg.server_params / cfg.client_params. Pure: no side
