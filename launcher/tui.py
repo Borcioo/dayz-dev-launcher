@@ -145,8 +145,8 @@ class ConfigScreen(ModalScreen):
     """
     BINDINGS = [("escape", "cancel", "Cancel")]
 
-    DIR_KEYS = {"dayz_path", "dayz_tools_path", "profiles_path",
-                "client_profiles_path"}
+    DIR_KEYS = {"dayz_path", "dayz_server_path", "dayz_tools_path",
+                "profiles_path", "client_profiles_path"}
     # file fields — picker stores just the filename (resolved at launch time)
     FILE_KEYS = {"exe_debug", "exe_normal", "client_exe_debug",
                  "client_exe_normal", "config_name"}
@@ -154,6 +154,7 @@ class ConfigScreen(ModalScreen):
     # (config key, human label) — every editable scalar
     SCALARS = [
         ("dayz_path", "DayZ install dir"),
+        ("dayz_server_path", "DayZ Server install dir (normal mode; empty = above)"),
         ("dayz_tools_path", "DayZ Tools dir"),
         ("profiles_path", "Server profiles dir"),
         ("client_profiles_path", "Client profiles dir"),
