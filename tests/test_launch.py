@@ -304,7 +304,7 @@ def test_debug_profiles_still_relative_to_client_install(tmp_path):
 
 
 class _CapturePopen:
-    """Records cmd + cwd; stands in for subprocess.Popen."""
+    """Records cmd + kwargs; stands in for subprocess.Popen."""
     last = None
 
     def __init__(self, cmd, **kwargs):

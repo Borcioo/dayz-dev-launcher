@@ -160,9 +160,9 @@ def test_dayz_server_path_missing_in_old_config(tmp_path):
     # configs saved before this key existed must load with the default
     path = tmp_path / "config.json"
     save(load(path), path)
-    data = json.loads(path.read_text())
+    data = json.loads(path.read_text(encoding="utf-8"))
     del data["dayz_server_path"]
-    path.write_text(json.dumps(data))
+    path.write_text(json.dumps(data), encoding="utf-8")
     assert load(path).dayz_server_path == ""
 
 

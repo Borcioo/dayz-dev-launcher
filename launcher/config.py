@@ -105,7 +105,8 @@ def save(cfg: Config, path: Path = DEFAULT_PATH) -> None:
 # scalar keys the user may edit via `dzl config set` or the TUI config screen.
 # (Lists like scan_roots/mods have their own helpers; logs_shown/mode are UI state.)
 EDITABLE_SCALARS = (
-    "dayz_path", "dayz_server_path", "dayz_tools_path", "profiles_path", "client_profiles_path",
+    "dayz_path", "dayz_server_path", "dayz_tools_path", "profiles_path",
+    "client_profiles_path",
     "exe_debug", "exe_normal", "client_exe_debug", "client_exe_normal",
     "port", "mission", "player_name", "config_name", "connect_ip",
 )
