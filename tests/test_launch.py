@@ -301,3 +301,48 @@ def test_debug_profiles_still_relative_to_client_install(tmp_path):
     cfg.profiles_path = r"E:\DayZ\profiles"
     args = build_args("debug", "server", cfg)
     assert "-profiles=profiles" in args
+
+
+class _CapturePopen:
+    """Records cmd + cwd; stands in for subprocess.Popen."""
+    last = None
+
+    def __init__(self, cmd, **kwargs):
+        _CapturePopen.last = (cmd, kwargs)
+        self.pid = 1
+
+
+def test_spawn_normal_server_runs_from_server_install(tmp_path, monkeypatch):
+    cfg = load(tmp_path / "config.json")
+    cfg.mods = []
+    cfg.dayz_path = r"E:\DayZ"
+    cfg.dayz_server_path = r"E:\DayZServer"
+    monkeypatch.setattr(launch_mod.subprocess, "Popen", _CapturePopen)
+    launch_mod.spawn("normal", "server", cfg)   # config_path=None -> no statefile
+    cmd, kwargs = _CapturePopen.last
+    assert cmd[0] == r"E:\DayZServer\DayZServer_x64.exe"
+    assert kwargs["cwd"] == r"E:\DayZServer"    # BattlEye resolves battleye\ from here
+
+
+def test_spawn_debug_server_stays_in_client_install(tmp_path, monkeypatch):
+    cfg = load(tmp_path / "config.json")
+    cfg.mods = []
+    cfg.dayz_path = r"E:\DayZ"
+    cfg.dayz_server_path = r"E:\DayZServer"
+    monkeypatch.setattr(launch_mod.subprocess, "Popen", _CapturePopen)
+    launch_mod.spawn("debug", "server", cfg)
+    cmd, kwargs = _CapturePopen.last
+    assert cmd[0] == r"E:\DayZ\DayZDiag_x64.exe"
+    assert kwargs["cwd"] == r"E:\DayZ"
+
+
+def test_spawn_client_ignores_server_install(tmp_path, monkeypatch):
+    cfg = load(tmp_path / "config.json")
+    cfg.mods = []
+    cfg.dayz_path = r"E:\DayZ"
+    cfg.dayz_server_path = r"E:\DayZServer"
+    monkeypatch.setattr(launch_mod.subprocess, "Popen", _CapturePopen)
+    launch_mod.spawn("normal", "client", cfg)
+    cmd, kwargs = _CapturePopen.last
+    assert cmd[0] == r"E:\DayZ\DayZ_x64.exe"
+    assert kwargs["cwd"] == r"E:\DayZ"

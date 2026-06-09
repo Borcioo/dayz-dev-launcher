@@ -234,9 +234,13 @@ def stop(exe: str) -> None:
 
 def spawn(mode: str, target: str, cfg: Config, *, source: str = "cli",
           config_path=None) -> subprocess.Popen:
-    exe = server_exe(cfg, mode) if target == "server" else client_exe(cfg, mode)
-    cmd = [str(Path(cfg.dayz_path) / exe), *build_args(mode, target, cfg)]
-    proc = subprocess.Popen(cmd, cwd=cfg.dayz_path)
+    if target == "server":
+        exe, base = server_exe(cfg, mode), server_base(cfg, mode)
+    else:
+        exe, base = client_exe(cfg, mode), cfg.dayz_path
+    # cwd matters: server BattlEye resolves its battleye\ dir relative to it
+    cmd = [str(Path(base) / exe), *build_args(mode, target, cfg)]
+    proc = subprocess.Popen(cmd, cwd=base)
     if config_path is not None:
         write_proc(config_path, target, proc.pid, mode, source, exe)
     return proc
