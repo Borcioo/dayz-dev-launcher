@@ -68,6 +68,11 @@ no binaries, nothing compiled or obfuscated. You can read every line on GitHub.
 - **Python 3.11+** on `PATH` (`python --version`)
 - A **DayZ install** (Steam) and, for debug/hot-reload, **DayZ Tools**
   (provides `DayZDiag_x64.exe`). Normal mode uses `DayZServer_x64.exe`.
+  If your DayZ Server is a separate Steam install
+  (`steamapps\common\DayZServer`), set **DayZ Server install dir** in the
+  config screen (or `dzl config set dayz_server_path <dir>`) — normal mode
+  then launches the server from that folder, which is required for BattlEye
+  to initialize with custom `-config`/`-profiles` paths.
 - Your mods on disk (e.g. a `P:\` work drive with `@CF`, `@COT`, your mod, …).
 
 `dzl` does **not** download or build mods — it launches what you already have.
@@ -216,6 +221,11 @@ the current mode's set and has a **Reset** to restore that mode's defaults.
 
 Paths to the executables, the server config and the profile folders can be
 absolute (point at files in another folder), not just names inside the DayZ dir.
+
+In **normal** mode the server resolves its exe, working directory and
+`-profiles=` against `dayz_server_path` when set (empty = the client install).
+Debug always runs from the client install — that's where `DayZDiag_x64.exe`
+lives.
 
 ## FAQ
 

@@ -13,6 +13,15 @@
 - The active profile is remembered between sessions (unchanged behaviour, now
   reliably reached because there is always an active profile).
 
+## 0.2.1
+
+### Fixed
+- BattlEye failed to init in normal mode with custom cfg/profiles paths:
+  new `dayz_server_path` option points at the dedicated DayZ Server install;
+  the server now launches from that directory (exe, cwd, `-profiles=`
+  relativization). Empty (default) keeps the old single-install behavior;
+  debug mode is unaffected. (user report)
+
 ## 0.2.0 — human + AI collaboration, mods UX, fully editable launch
 
 ### Human + tool work on the same launcher
