@@ -10,6 +10,11 @@ _DAYZ = r"E:\Steam\steamapps\common\DayZ"
 
 DEFAULTS = {
     "dayz_path": _DAYZ,
+    # dedicated DayZ Server install (steamapps\common\DayZServer). Used by the
+    # server target in NORMAL mode only (exe dir, cwd, -profiles relativization);
+    # empty = fall back to dayz_path. Debug always uses dayz_path (DayZDiag
+    # lives in the client install).
+    "dayz_server_path": "",
     "dayz_tools_path": r"E:\Steam\steamapps\common\DayZ Tools",
     "profiles_path": _DAYZ + r"\profiles",
     "client_profiles_path": _DAYZ + r"\profiles_client",
@@ -47,6 +52,7 @@ DEFAULT_PATH = Path(__file__).resolve().parent.parent / "config.json"
 @dataclass
 class Config:
     dayz_path: str
+    dayz_server_path: str
     dayz_tools_path: str
     profiles_path: str
     client_profiles_path: str
@@ -99,7 +105,7 @@ def save(cfg: Config, path: Path = DEFAULT_PATH) -> None:
 # scalar keys the user may edit via `dzl config set` or the TUI config screen.
 # (Lists like scan_roots/mods have their own helpers; logs_shown/mode are UI state.)
 EDITABLE_SCALARS = (
-    "dayz_path", "dayz_tools_path", "profiles_path", "client_profiles_path",
+    "dayz_path", "dayz_server_path", "dayz_tools_path", "profiles_path", "client_profiles_path",
     "exe_debug", "exe_normal", "client_exe_debug", "client_exe_normal",
     "port", "mission", "player_name", "config_name", "connect_ip",
 )

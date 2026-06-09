@@ -149,3 +149,24 @@ def test_ensure_default_idempotent(tmp_path):
     ensure_default(path)
     ensure_default(path)  # second call must not re-seed or clobber
     assert list_presets(path) == ["default"]
+
+
+def test_dayz_server_path_defaults_empty(tmp_path):
+    cfg = load(tmp_path / "config.json")
+    assert cfg.dayz_server_path == ""
+
+
+def test_dayz_server_path_missing_in_old_config(tmp_path):
+    # configs saved before this key existed must load with the default
+    path = tmp_path / "config.json"
+    save(load(path), path)
+    data = json.loads(path.read_text())
+    del data["dayz_server_path"]
+    path.write_text(json.dumps(data))
+    assert load(path).dayz_server_path == ""
+
+
+def test_dayz_server_path_is_editable_scalar(tmp_path):
+    cfg = load(tmp_path / "config.json")
+    set_scalar(cfg, "dayz_server_path", r"E:\Steam\steamapps\common\DayZServer")
+    assert cfg.dayz_server_path == r"E:\Steam\steamapps\common\DayZServer"
