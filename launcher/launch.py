@@ -186,8 +186,8 @@ def server_base(cfg: Config, mode: str) -> str:
 def build_args(mode: str, target: str, cfg: Config) -> list[str]:
     """Full argv for a (mode, target). Core args are built from config; the rest
     are the editable cfg.server_params / cfg.client_params. Pure: no side
-    effects. (mode selects the exe elsewhere; it doesn't change the args here.)"""
-    server_profiles = _profiles_arg(cfg.profiles_path, cfg.dayz_path)
+    effects. (mode selects the exe elsewhere; here it only picks the -server flag and the server profiles base.)"""
+    server_profiles = _profiles_arg(cfg.profiles_path, server_base(cfg, mode))
     client_profiles = _profiles_arg(cfg.client_profiles_path, cfg.dayz_path)
     if target == "server":
         args = []

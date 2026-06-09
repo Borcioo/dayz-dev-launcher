@@ -274,3 +274,30 @@ def test_server_base_debug_ignores_server_install(tmp_path):
     cfg.dayz_path = r"E:\DayZ"
     cfg.dayz_server_path = r"E:\DayZServer"
     assert server_base(cfg, "debug") == r"E:\DayZ"
+
+
+def test_normal_profiles_relative_to_server_install(tmp_path):
+    cfg = load(tmp_path / "config.json")
+    cfg.dayz_path = r"E:\DayZ"
+    cfg.dayz_server_path = r"E:\DayZServer"
+    cfg.profiles_path = r"E:\DayZServer\profiles"
+    args = build_args("normal", "server", cfg)
+    assert "-profiles=profiles" in args
+
+
+def test_normal_profiles_absolute_when_outside_server_install(tmp_path):
+    cfg = load(tmp_path / "config.json")
+    cfg.dayz_path = r"E:\DayZ"
+    cfg.dayz_server_path = r"E:\DayZServer"
+    cfg.profiles_path = r"E:\DayZ\profiles"   # under CLIENT install now
+    args = build_args("normal", "server", cfg)
+    assert r"-profiles=E:\DayZ\profiles" in args
+
+
+def test_debug_profiles_still_relative_to_client_install(tmp_path):
+    cfg = load(tmp_path / "config.json")
+    cfg.dayz_path = r"E:\DayZ"
+    cfg.dayz_server_path = r"E:\DayZServer"
+    cfg.profiles_path = r"E:\DayZ\profiles"
+    args = build_args("debug", "server", cfg)
+    assert "-profiles=profiles" in args
